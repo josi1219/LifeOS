@@ -18,11 +18,13 @@ interface TimerContextValue {
   activeSession: TimeSession | null
   status: 'idle' | 'running' | 'paused'
   elapsedSeconds: number
+  targetDurationSeconds: number
+  setTargetDurationSeconds: (seconds: number) => void
   formattedTime: string
   summary: TimeSummaryResponse | null
   isLoading: boolean
   isStopModalOpen: boolean
-  startTimer: (request?: TimeSessionStartRequest) => Promise<TimeSession>
+  startTimer: (request?: TimeSessionStartRequest, targetSeconds?: number) => Promise<TimeSession>
   pauseTimer: () => Promise<void>
   resumeTimer: () => Promise<void>
   stopTimer: (note?: string, updateFocusNote?: boolean) => Promise<void>
@@ -69,9 +71,18 @@ export function formatDuration(totalSeconds: number): string {
 export function TimerProvider({ children }: { children: ReactNode }) {
   const [activeSession, setActiveSession] = useState<TimeSession | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0)
+  const [targetDurationSeconds, setTargetDurationSecondsState] = useState<number>(() => {
+    const saved = localStorage.getItem('lifeos_planned_focus_seconds')
+    return saved ? parseInt(saved, 10) : 10800 // 3 hours default (10800s)
+  })
   const [summary, setSummary] = useState<TimeSummaryResponse | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isStopModalOpen, setIsStopModalOpen] = useState<boolean>(false)
+
+  const setTargetDurationSeconds = useCallback((seconds: number) => {
+    setTargetDurationSecondsState(seconds)
+    localStorage.setItem('lifeos_planned_focus_seconds', seconds.toString())
+  }, [])
 
   const refreshActive = useCallback(async () => {
     try {
@@ -126,14 +137,17 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   }, [activeSession])
 
   const startTimer = useCallback(
-    async (request: TimeSessionStartRequest = {}) => {
+    async (request: TimeSessionStartRequest = {}, targetSeconds?: number) => {
+      if (targetSeconds !== undefined && targetSeconds > 0) {
+        setTargetDurationSeconds(targetSeconds)
+      }
       const created = await api.post<TimeSession>('/time-sessions/start', request)
       setActiveSession(created)
       setElapsedSeconds(0)
       void refreshSummary()
       return created
     },
-    [refreshSummary]
+    [refreshSummary, setTargetDurationSeconds]
   )
 
   const pauseTimer = useCallback(async () => {
@@ -197,6 +211,8 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       activeSession,
       status,
       elapsedSeconds,
+      targetDurationSeconds,
+      setTargetDurationSeconds,
       formattedTime,
       summary,
       isLoading,
@@ -215,6 +231,8 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       activeSession,
       status,
       elapsedSeconds,
+      targetDurationSeconds,
+      setTargetDurationSeconds,
       formattedTime,
       summary,
       isLoading,

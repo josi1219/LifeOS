@@ -81,3 +81,4 @@ export const api = {
 }
 
 export { ApiError, refreshAccessToken }
+export default api

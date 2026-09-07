@@ -8,7 +8,7 @@ from app.schemas.roadmap_item import (
     RoadmapItemTreeResponse,
     RoadmapItemUpdate,
 )
-from app.services.errors import NotFoundError
+from app.services.errors import NotFoundError, ValidationError
 
 
 async def get_item_or_404(session: AsyncSession, item_id: int, user_id: int) -> RoadmapItem:
@@ -77,12 +77,32 @@ async def get_flat_items(session: AsyncSession, roadmap_id: int) -> list[Roadmap
 
 
 async def create_item(session: AsyncSession, roadmap_id: int, data: RoadmapItemCreate) -> RoadmapItem:
+    if data.parent_id is not None:
+        parent = await session.get(RoadmapItem, data.parent_id)
+        if parent is not None and parent.estimated_hours is not None:
+            existing_children = await roadmap_item_repo.list_children(session, data.parent_id)
+            allocated = sum(c.estimated_hours or 0.0 for c in existing_children)
+            new_sub_hours = data.estimated_hours or 0.0
+            if allocated + new_sub_hours > parent.estimated_hours:
+                raise ValidationError(
+                    f"Sub-skills total allocated hours ({allocated + new_sub_hours}h) cannot exceed parent step allocated hours ({parent.estimated_hours}h)."
+                )
     fields = data.model_dump()
     return await roadmap_item_repo.create(session, roadmap_id=roadmap_id, **fields)
 
 
 async def update_item(session: AsyncSession, item: RoadmapItem, data: RoadmapItemUpdate) -> RoadmapItem:
     updates = data.model_dump(exclude_unset=True)
+    if "estimated_hours" in updates and item.parent_id is not None:
+        parent = await session.get(RoadmapItem, item.parent_id)
+        if parent is not None and parent.estimated_hours is not None:
+            existing_children = await roadmap_item_repo.list_children(session, item.parent_id)
+            allocated = sum(c.estimated_hours or 0.0 for c in existing_children if c.id != item.id)
+            new_sub_hours = updates["estimated_hours"] or 0.0
+            if allocated + new_sub_hours > parent.estimated_hours:
+                raise ValidationError(
+                    f"Sub-skills total allocated hours ({allocated + new_sub_hours}h) cannot exceed parent step allocated hours ({parent.estimated_hours}h)."
+                )
     for field, value in updates.items():
         setattr(item, field, value)
     await session.flush()
@@ -91,6 +111,21 @@ async def update_item(session: AsyncSession, item: RoadmapItem, data: RoadmapIte
 
 async def delete_item(session: AsyncSession, item: RoadmapItem) -> None:
     await roadmap_item_repo.delete(session, item)
+
+
+async def reorder_items(
+    session: AsyncSession, roadmap_id: int, ordered_ids: list[int]
+) -> list[RoadmapItem]:
+    """Update sort_order for items based on their position in ordered_ids."""
+    items = await roadmap_item_repo.list_for_roadmap(session, roadmap_id)
+    id_to_item = {item.id: item for item in items}
+    result: list[RoadmapItem] = []
+    for idx, item_id in enumerate(ordered_ids):
+        if item_id in id_to_item:
+            id_to_item[item_id].sort_order = idx
+            result.append(id_to_item[item_id])
+    await session.flush()
+    return result
 
 
 async def add_prerequisite(

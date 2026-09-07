@@ -11,6 +11,16 @@ async def list_for_department(session: AsyncSession, department_id: int) -> list
     return list(result.scalars())
 
 
+async def list_for_user(session: AsyncSession, user_id: int) -> list[Goal]:
+    result = await session.execute(
+        select(Goal)
+        .join(Department, Department.id == Goal.department_id)
+        .where(Department.user_id == user_id)
+        .order_by(Goal.priority, Goal.created_at)
+    )
+    return list(result.scalars())
+
+
 async def get_for_user(session: AsyncSession, goal_id: int, user_id: int) -> Goal | None:
     """Owns-through-department check: a goal belongs to the user only if its department does."""
     result = await session.execute(

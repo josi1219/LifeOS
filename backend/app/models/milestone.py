@@ -19,6 +19,13 @@ milestone_projects = Table(
     Column("project_id", Integer, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True),
 )
 
+milestone_roadmap_items = Table(
+    "milestone_roadmap_items",
+    Base.metadata,
+    Column("milestone_id", Integer, ForeignKey("milestones.id", ondelete="CASCADE"), primary_key=True),
+    Column("roadmap_item_id", Integer, ForeignKey("roadmap_items.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class Milestone(Base):
     __tablename__ = "milestones"

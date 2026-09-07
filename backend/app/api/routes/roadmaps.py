@@ -3,11 +3,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
-from app.schemas.roadmap import RoadmapCreate, RoadmapResponse, RoadmapUpdate
-from app.services import department_service, roadmap_service
+from app.schemas.roadmap import (
+    GoalRoadmapDetailResponse,
+    RoadmapCreate,
+    RoadmapResponse,
+    RoadmapUpdate,
+)
+from app.services import department_service, roadmap_item_service, roadmap_service
 from app.services.errors import NotFoundError
 
 router = APIRouter(prefix="/api", tags=["roadmaps"])
+
+
+@router.get("/goals/{goal_id}/roadmap", response_model=GoalRoadmapDetailResponse)
+async def get_goal_roadmap(
+    goal_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> GoalRoadmapDetailResponse:
+    try:
+        roadmap = await roadmap_service.get_or_create_for_goal(session, goal_id, current_user.id)
+        await session.commit()
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found") from exc
+    items = await roadmap_item_service.get_tree(session, roadmap.id)
+    total_steps = len(items)
+    completed_steps = sum(1 for it in items if it.status == "completed")
+    prog = int(round((completed_steps / total_steps) * 100)) if total_steps > 0 else 0
+    return GoalRoadmapDetailResponse(
+        roadmap=RoadmapResponse.model_validate(roadmap),
+        items=items,
+        total_steps=total_steps,
+        completed_steps=completed_steps,
+        progress=prog,
+    )
 
 
 @router.get("/departments/{department_id}/roadmaps", response_model=list[RoadmapResponse])

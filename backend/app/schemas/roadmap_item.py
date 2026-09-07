@@ -60,3 +60,7 @@ class RoadmapItemTreeResponse(BaseModel):
 
 class PrerequisiteRequest(BaseModel):
     prerequisite_item_id: int
+
+
+class ReorderRequest(BaseModel):
+    ordered_ids: list[int]

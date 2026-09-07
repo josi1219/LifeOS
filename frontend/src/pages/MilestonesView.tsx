@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { api } from '../api/client'
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -27,6 +28,12 @@ interface Milestone {
   skillsTotalCount: number
 }
 
+interface RoadmapSubSkillOption {
+  id: number
+  name: string
+  stepName: string
+}
+
 interface GoalOption {
   id: string
   title: string
@@ -39,152 +46,154 @@ export function MilestonesView({ departmentId: _departmentId }: { departmentId?:
   const navigate = useNavigate()
 
   // Goals list for header switcher
-  const [goals] = useState<GoalOption[]>([
-    {
-      id: 'ml',
-      title: 'Become a Machine Learning Engineer',
-      totalMilestones: 8,
-      completedMilestones: 3,
-      progress: 38,
-    },
-    {
-      id: 'web',
-      title: 'Build a Web Application',
-      totalMilestones: 6,
-      completedMilestones: 2,
-      progress: 45,
-    },
-    {
-      id: 'health',
-      title: 'Improve Physical Health',
-      totalMilestones: 5,
-      completedMilestones: 1,
-      progress: 20,
-    },
-  ])
-
-  const [activeGoalId, setActiveGoalId] = useState('ml')
+  const [goals, setGoals] = useState<GoalOption[]>([])
+  const [activeGoalId, setActiveGoalId] = useState<string>('')
   const [isGoalDropdownOpen, setIsGoalDropdownOpen] = useState(false)
-  const activeGoal = goals.find((g) => g.id === activeGoalId) || goals[0]
+  const activeGoal = goals.find((g) => g.id === activeGoalId) || goals[0] || null
 
   // Filter state
   const [filterState, setFilterState] = useState<'Active' | 'Completed' | 'All'>('Active')
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false)
 
   // Milestones list
-  const [milestones, setMilestones] = useState<Milestone[]>([
-    {
-      id: 'm1',
-      stepNumber: 1,
-      title: 'Python Fundamentals',
-      dueDate: 'Apr 25, 2025',
-      description: 'Learn the basics of Python including syntax, variables, loops, functions and data structures.',
-      relatedSkills: ['Python', 'Basic Programming'],
-      progress: 100,
-      status: 'completed',
-      skillsCompletedCount: 2,
-      skillsTotalCount: 2,
-    },
-    {
-      id: 'm2',
-      stepNumber: 2,
-      title: 'Build a Web Application',
-      dueDate: 'May 15, 2025',
-      description: 'Learn how to build a simple web app using HTML, CSS, JavaScript and a backend framework.',
-      relatedSkills: ['HTML', 'CSS', 'JavaScript', 'FastAPI'],
-      progress: 45,
-      status: 'in_progress',
-      skillsCompletedCount: 4,
-      skillsTotalCount: 8,
-    },
-    {
-      id: 'm3',
-      stepNumber: 3,
-      title: 'Machine Learning Basics',
-      dueDate: 'Jun 30, 2025',
-      description: 'Understand ML concepts, data preprocessing, model training and evaluation.',
-      relatedSkills: ['ML Basics', 'Data Preprocessing', 'Model Evaluation'],
-      progress: 20,
-      status: 'in_progress',
-      skillsCompletedCount: 1,
-      skillsTotalCount: 5,
-    },
-    {
-      id: 'm4',
-      stepNumber: 4,
-      title: 'Deep Learning Fundamentals',
-      dueDate: 'Aug 10, 2025',
-      description: 'Learn neural networks, TensorFlow/PyTorch, and build basic deep learning models.',
-      relatedSkills: ['Neural Networks', 'PyTorch', 'CNNs'],
-      progress: 0,
-      status: 'not_started',
-      skillsCompletedCount: 0,
-      skillsTotalCount: 6,
-    },
-    {
-      id: 'm5',
-      stepNumber: 5,
-      title: 'Build a Portfolio Project',
-      dueDate: 'Oct 1, 2025',
-      description: 'Apply your skills to build a real project and deploy it online.',
-      relatedSkills: ['Full Stack', 'Deployment', 'Git'],
-      progress: 0,
-      status: 'not_started',
-      skillsCompletedCount: 0,
-      skillsTotalCount: 5,
-    },
-  ])
+  const [milestones, setMilestones] = useState<Milestone[]>([])
+
+  // Available roadmap sub-skills for linking
+  const [availableRoadmapSkills, setAvailableRoadmapSkills] = useState<RoadmapSubSkillOption[]>([])
 
   // Form states for creating a new milestone
   const [newTitle, setNewTitle] = useState('')
-  const [newDeadline, setNewDeadline] = useState('Apr 30, 2025')
+  const [newDeadline, setNewDeadline] = useState('')
   const [newDesc, setNewDesc] = useState('')
-  const [selectedSkills, setSelectedSkills] = useState<string[]>(['Machine Learning', 'Python'])
+  const [selectedSkills, setSelectedSkills] = useState<RoadmapSubSkillOption[]>([])
   const [isSkillPickerOpen, setIsSkillPickerOpen] = useState(false)
 
-  // Available skills from roadmap to attach
-  const availableRoadmapSkills = [
-    'Python',
-    'Machine Learning',
-    'Neural Networks',
-    'FastAPI',
-    'Docker',
-    'SQLAlchemy',
-    'PyTorch',
-    'Scikit-learn',
-  ]
+  // Fetch real goals and milestones from backend
+  useEffect(() => {
+    api.get<any[]>('/goals').then((bgGoals) => {
+      if (bgGoals && bgGoals.length > 0) {
+        const mapped = bgGoals.map((bg) => ({
+          id: String(bg.id),
+          title: bg.name,
+          totalMilestones: bg.milestones_count || 0,
+          completedMilestones: bg.completed_milestones_count || 0,
+          progress: bg.progress || 0,
+        }))
+        setGoals(mapped)
+        setActiveGoalId(mapped[0].id)
+      }
+    }).catch(() => {})
 
-  const handleAddSkillToMilestone = (skillName: string) => {
-    if (!selectedSkills.includes(skillName)) {
-      setSelectedSkills([...selectedSkills, skillName])
+    api.get<any[]>('/milestones').then((bgMs) => {
+      if (bgMs) {
+        const mapped: Milestone[] = bgMs.map((m, idx) => ({
+          id: String(m.id),
+          stepNumber: idx + 1,
+          title: m.name,
+          dueDate: m.completion_date
+            ? new Date(m.completion_date).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })
+            : 'No deadline',
+          description: m.description || 'Target milestone connected to roadmap skills.',
+          relatedSkills: m.skill_names && m.skill_names.length > 0 ? m.skill_names : [],
+          progress: m.progress ?? 0,
+          status: m.status === 'completed' ? 'completed' : m.progress > 0 ? 'in_progress' : 'not_started',
+          skillsCompletedCount: m.skills_completed_count ?? (m.status === 'completed' ? (m.skill_names?.length || 0) : 0),
+          skillsTotalCount: m.skills_total_count ?? (m.skill_names?.length || 0),
+        }))
+        setMilestones(mapped)
+      }
+    }).catch(() => {})
+  }, [])
+
+  // Fetch real roadmap sub-skills when activeGoalId changes
+  useEffect(() => {
+    if (!activeGoalId || isNaN(Number(activeGoalId))) {
+      setAvailableRoadmapSkills([])
+      return
+    }
+    api.get<any>(`/goals/${activeGoalId}/roadmap`).then((res) => {
+      if (res && res.items) {
+        const skills: RoadmapSubSkillOption[] = []
+        res.items.forEach((step: any) => {
+          if (step.children && step.children.length > 0) {
+            step.children.forEach((ch: any) => {
+              skills.push({ id: ch.id, name: ch.name, stepName: step.name })
+            })
+          } else {
+            skills.push({ id: step.id, name: step.name, stepName: step.name })
+          }
+        })
+        setAvailableRoadmapSkills(skills)
+      }
+    }).catch(() => {})
+  }, [activeGoalId])
+
+  const handleAddSkillToMilestone = (skill: RoadmapSubSkillOption) => {
+    if (!selectedSkills.some((s) => s.id === skill.id)) {
+      setSelectedSkills([...selectedSkills, skill])
     }
     setIsSkillPickerOpen(false)
   }
 
-  const handleRemoveSkillFromMilestone = (skillName: string) => {
-    setSelectedSkills(selectedSkills.filter((s) => s !== skillName))
+  const handleRemoveSkillFromMilestone = (skillId: number) => {
+    setSelectedSkills(selectedSkills.filter((s) => s.id !== skillId))
   }
 
-  const handleCreateMilestone = (e: React.FormEvent) => {
+  const handleCreateMilestone = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle.trim()) return
 
+    let createdId = `m-${Date.now()}`
+    let createdDate = newDeadline || 'No deadline'
+    try {
+      const payload: any = {
+        name: newTitle.trim(),
+        description: newDesc.trim() || undefined,
+        goal_id: !isNaN(Number(activeGoalId)) ? Number(activeGoalId) : undefined,
+        skill_ids: selectedSkills.map((s) => s.id),
+      }
+      if (newDeadline) {
+        const parsed = new Date(newDeadline)
+        if (!isNaN(parsed.getTime())) {
+          payload.completion_date = parsed.toISOString().split('T')[0]
+        }
+      }
+      const res = await api.post<any>('/milestones', payload)
+      if (res && res.id) {
+        createdId = String(res.id)
+        if (res.completion_date) {
+          createdDate = new Date(res.completion_date).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Failed to create milestone in backend', err)
+    }
+
     const newM: Milestone = {
-      id: `m-${Date.now()}`,
+      id: createdId,
       stepNumber: milestones.length + 1,
       title: newTitle.trim(),
-      dueDate: newDeadline,
+      dueDate: createdDate,
       description: newDesc.trim() || 'Custom targeted milestone connected to roadmap skills.',
-      relatedSkills: selectedSkills.length > 0 ? selectedSkills : ['General'],
+      relatedSkills: selectedSkills.map((s) => s.name),
       progress: 0,
       status: 'not_started',
       skillsCompletedCount: 0,
-      skillsTotalCount: selectedSkills.length || 1,
+      skillsTotalCount: selectedSkills.length,
     }
 
     setMilestones([newM, ...milestones])
     setNewTitle('')
     setNewDesc('')
+    setSelectedSkills([])
   }
 
   // Filtered milestones
@@ -346,7 +355,7 @@ export function MilestonesView({ departmentId: _departmentId }: { departmentId?:
                         textAlign: 'left',
                       }}
                     >
-                      <span>{activeGoal.title}</span>
+                      <span>{activeGoal ? activeGoal.title : 'Select a Goal'}</span>
                       <ChevronDown size={14} color="#8e95a5" />
                     </button>
 
@@ -391,19 +400,19 @@ export function MilestonesView({ departmentId: _departmentId }: { departmentId?:
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: 11, color: '#8e95a5' }}>
-                <span>{activeGoal.totalMilestones} milestones</span>
+                <span>{activeGoal?.totalMilestones || 0} milestones</span>
                 <span>•</span>
-                <span>{activeGoal.completedMilestones} completed</span>
+                <span>{activeGoal?.completedMilestones || 0} completed</span>
                 <span>•</span>
-                <span>{activeGoal.totalMilestones - activeGoal.completedMilestones} remaining</span>
+                <span>{Math.max(0, (activeGoal?.totalMilestones || 0) - (activeGoal?.completedMilestones || 0))} remaining</span>
               </div>
 
               {/* Overall Progress Bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, maxWidth: 360 }}>
                 <div style={{ flex: 1, height: 4, background: 'rgba(255, 255, 255, 0.08)', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ width: `${activeGoal.progress}%`, height: '100%', background: '#00e599' }} />
+                  <div style={{ width: `${activeGoal?.progress || 0}%`, height: '100%', background: '#00e599' }} />
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#ffffff' }}>{activeGoal.progress}%</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#ffffff' }}>{activeGoal?.progress || 0}%</span>
               </div>
             </div>
 
@@ -485,11 +494,29 @@ export function MilestonesView({ departmentId: _departmentId }: { departmentId?:
             </div>
 
             <div className="flow-milestones-list">
-              {filteredMilestones.map((m) => {
-                const isCompleted = m.status === 'completed'
+              {filteredMilestones.length === 0 ? (
+                <div
+                  className="flow-card"
+                  style={{
+                    textAlign: 'center',
+                    padding: '36px 20px',
+                    color: '#8e95a5',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px dashed var(--color-border)',
+                  }}
+                >
+                  <Target size={28} color="#8e95a5" style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#ffffff', marginBottom: 4 }}>No Milestones Yet</div>
+                  <div style={{ fontSize: 11.5, color: '#8e95a5', maxWidth: 320, margin: '0 auto' }}>
+                    Connect your roadmap sub-skills to a milestone on the right to start tracking completion deadlines.
+                  </div>
+                </div>
+              ) : (
+                filteredMilestones.map((m) => {
+                  const isCompleted = m.status === 'completed'
 
-                return (
-                  <div key={m.id} className={`flow-milestone-card ${isCompleted ? 'completed' : ''}`}>
+                  return (
+                    <div key={m.id} className={`flow-milestone-card ${isCompleted ? 'completed' : ''}`}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, minWidth: 0 }}>
                       {/* Node circle */}
                       <div
@@ -560,7 +587,7 @@ export function MilestonesView({ departmentId: _departmentId }: { departmentId?:
                     </div>
                   </div>
                 )
-              })}
+              }))}
             </div>
           </div>
         </div>
@@ -615,24 +642,23 @@ export function MilestonesView({ departmentId: _departmentId }: { departmentId?:
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
                   {selectedSkills.map((sk) => (
                     <span
-                      key={sk}
+                      key={sk.id}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 4,
-                        background: 'rgba(0, 229, 153, 0.1)',
-                        border: '1px solid rgba(0, 229, 153, 0.25)',
-                        color: '#00e599',
                         fontSize: 10,
+                        background: 'rgba(0, 229, 153, 0.1)',
+                        color: '#00e599',
                         padding: '1px 6px',
                         borderRadius: 'var(--radius-full)',
                       }}
                     >
-                      <span>{sk}</span>
+                      <span>{sk.name}</span>
                       <X
                         size={10}
                         style={{ cursor: 'pointer' }}
-                        onClick={() => handleRemoveSkillFromMilestone(sk)}
+                        onClick={() => handleRemoveSkillFromMilestone(sk.id)}
                       />
                     </span>
                   ))}
@@ -658,7 +684,7 @@ export function MilestonesView({ departmentId: _departmentId }: { departmentId?:
                     }}
                   >
                     <Plus size={11} />
-                    <span>Add Skill</span>
+                    <span>Add Roadmap Sub-Skill</span>
                   </button>
 
                   {isSkillPickerOpen && (
@@ -673,26 +699,39 @@ export function MilestonesView({ departmentId: _departmentId }: { departmentId?:
                         border: '1px solid var(--color-border)',
                         borderRadius: 'var(--radius-sm)',
                         zIndex: 50,
-                        maxHeight: 140,
+                        maxHeight: 160,
                         overflowY: 'auto',
                         boxShadow: 'var(--shadow-md)',
                       }}
                     >
-                      {availableRoadmapSkills.map((sk) => (
-                        <div
-                          key={sk}
-                          onClick={() => handleAddSkillToMilestone(sk)}
-                          style={{
-                            padding: '6px 10px',
-                            fontSize: 11,
-                            color: selectedSkills.includes(sk) ? '#00e599' : '#ffffff',
-                            cursor: 'pointer',
-                            background: selectedSkills.includes(sk) ? 'rgba(0, 229, 153, 0.08)' : 'transparent',
-                          }}
-                        >
-                          {sk}
+                      {availableRoadmapSkills.length === 0 ? (
+                        <div style={{ padding: '8px 10px', fontSize: 10.5, color: '#8e95a5' }}>
+                          No roadmap sub-skills found for this goal. Add steps/sub-skills in Roadmap first.
                         </div>
-                      ))}
+                      ) : (
+                        availableRoadmapSkills.map((sk) => {
+                          const isSelected = selectedSkills.some((s) => s.id === sk.id)
+                          return (
+                            <div
+                              key={sk.id}
+                              onClick={() => handleAddSkillToMilestone(sk)}
+                              style={{
+                                padding: '6px 10px',
+                                fontSize: 11,
+                                color: isSelected ? '#00e599' : '#ffffff',
+                                cursor: 'pointer',
+                                background: isSelected ? 'rgba(0, 229, 153, 0.08)' : 'transparent',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                              }}
+                            >
+                              <span>{sk.name}</span>
+                              <span style={{ fontSize: 9.5, color: '#8e95a5' }}>{sk.stepName}</span>
+                            </div>
+                          )
+                        })
+                      )}
                     </div>
                   )}
                 </div>

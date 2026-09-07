@@ -1,12 +1,17 @@
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.goal import Goal
+from app.models.roadmap import Roadmap
+from app.models.roadmap_item import RoadmapItem
 from app.models.time_session import TimeSession
 from app.repositories import (
     department_repo,
     focus_repo,
     goal_repo,
+    milestone_repo,
     project_repo,
     roadmap_item_repo,
     skill_repo,
@@ -176,6 +181,75 @@ async def resume_session(session: AsyncSession, session_id: int, user_id: int) -
     return await _enrich_response(session, ts, user_id)
 
 
+async def _cascade_progress_update(session: AsyncSession, user_id: int, roadmap_item_id: int) -> None:
+    item = await session.get(RoadmapItem, roadmap_item_id)
+    if item is None:
+        return
+
+    # 1. Update sub-skill progress based on total completed duration
+    result = await session.execute(
+        select(func.sum(TimeSession.duration_seconds)).where(
+            TimeSession.user_id == user_id,
+            TimeSession.roadmap_item_id == item.id,
+            TimeSession.status == "completed",
+        )
+    )
+    total_seconds = result.scalar() or 0
+    invested_hours = total_seconds / 3600.0
+
+    if item.estimated_hours and item.estimated_hours > 0:
+        new_progress = min(100, round((invested_hours / item.estimated_hours) * 100))
+    else:
+        new_progress = 100 if invested_hours > 0 else 0
+
+    item.progress = new_progress
+    if new_progress >= 100:
+        item.status = "completed"
+    elif new_progress > 0:
+        item.status = "in_progress"
+    await session.flush()
+
+    # 2. Update Parent Step (if this is a sub-skill with parent_id)
+    if item.parent_id is not None:
+        parent = await session.get(RoadmapItem, item.parent_id)
+        if parent is not None:
+            children = await roadmap_item_repo.list_children(session, parent.id)
+            if children:
+                parent.progress = round(sum(c.progress for c in children) / len(children))
+                if all(c.status == "completed" for c in children):
+                    parent.status = "completed"
+                elif any(c.progress > 0 for c in children):
+                    parent.status = "in_progress"
+                await session.flush()
+
+    # 3. Update Roadmap / Goal
+    roadmap = await session.get(Roadmap, item.roadmap_id)
+    if roadmap and roadmap.goal_id:
+        goal = await session.get(Goal, roadmap.goal_id)
+        if goal:
+            all_items = await roadmap_item_repo.list_for_roadmap(session, roadmap.id)
+            root_items = [i for i in all_items if i.parent_id is None]
+            if root_items:
+                goal.progress = round(sum(r.progress for r in root_items) / len(root_items))
+                if goal.progress >= 100:
+                    goal.status = "completed"
+                elif goal.progress > 0:
+                    goal.status = "in_progress"
+                await session.flush()
+
+    # 4. Update any Milestones attached to this roadmap_item
+    milestones = await milestone_repo.list_milestones_for_roadmap_item(session, item.id)
+    for ms in milestones:
+        linked_items = await milestone_repo.list_linked_roadmap_items(session, ms.id)
+        if linked_items:
+            ms.progress = round(sum(li.progress for li in linked_items) / len(linked_items))
+            if all(li.status == "completed" for li in linked_items):
+                ms.status = "completed"
+            elif any(li.progress > 0 for li in linked_items):
+                ms.status = "in_progress"
+    await session.flush()
+
+
 async def stop_session(
     session: AsyncSession, session_id: int, user_id: int, payload: TimeSessionStopRequest
 ) -> TimeSessionResponse:
@@ -201,6 +275,10 @@ async def stop_session(
                 focus.note = payload.note
 
     await session.flush()
+
+    if ts.roadmap_item_id:
+        await _cascade_progress_update(session, user_id, ts.roadmap_item_id)
+
     return await _enrich_response(session, ts, user_id)
 
 
@@ -249,6 +327,8 @@ async def log_manual_session(
         task_id=payload.task_id,
         note=payload.note,
     )
+    if ts.roadmap_item_id:
+        await _cascade_progress_update(session, user_id, ts.roadmap_item_id)
     return await _enrich_response(session, ts, user_id)
 
 

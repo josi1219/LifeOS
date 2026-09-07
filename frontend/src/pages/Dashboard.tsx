@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
+  BarChart3,
   Brain,
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -15,44 +16,294 @@ import {
   Globe,
   Heart,
   LineChart,
+  Plus,
   Target,
   Zap,
 } from 'lucide-react'
+import api from '../api/client'
+import type { Goal, Milestone, CalendarMonthResponse, DashboardOverview } from '../api/types'
 import { useTimer } from '../features/timer/TimerContext'
 import './Dashboard.css'
 
 export function Dashboard() {
   const navigate = useNavigate()
-  const { startTimer } = useTimer()
+  const { startTimer, summary, setTargetDurationSeconds } = useTimer()
 
-  // Selected Skill and Sub-Skill state
-  const [selectedSkill, setSelectedSkill] = useState('Machine Learning')
-  const [selectedSubSkill, setSelectedSubSkill] = useState('Neural Networks')
-  const [isSkillDropdownOpen, setIsSkillDropdownOpen] = useState(false)
-  const [isSubSkillDropdownOpen, setIsSubSkillDropdownOpen] = useState(false)
+  // Real backend states
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [milestones, setMilestones] = useState<Milestone[]>([])
+  const [overview, setOverview] = useState<DashboardOverview | null>(null)
+  const [calendarEvents, setCalendarEvents] = useState<Record<number, { type: string; color: string }>>({})
+
+  // Selected Goal and Roadmap Item state
+  const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null)
+  const [selectedRoadmapItemId, setSelectedRoadmapItemId] = useState<number | null>(null)
+  const [roadmapSteps, setRoadmapSteps] = useState<
+    Array<{
+      id: number
+      name: string
+      estimated_hours?: number
+      invested_hours?: number
+      progress?: number
+      children: Array<{
+        id: number
+        name: string
+        estimated_hours?: number
+        invested_hours?: number
+        progress?: number
+      }>
+    }>
+  >([])
+  const [isGoalDropdownOpen, setIsGoalDropdownOpen] = useState(false)
+  const [isStepDropdownOpen, setIsStepDropdownOpen] = useState(false)
   const [overviewRange, setOverviewRange] = useState('Last 30 days')
   const [isOverviewDropdownOpen, setIsOverviewDropdownOpen] = useState(false)
 
-  const skillsList = [
-    { id: 'ml', name: 'Machine Learning', subSkills: ['Neural Networks', 'Python Basics', 'PyTorch', 'Data Preprocessing'] },
-    { id: 'web', name: 'Web Development', subSkills: ['Frontend Architecture', 'React & Vite', 'FastAPI', 'PostgreSQL'] },
-    { id: 'ds', name: 'Data Science', subSkills: ['Exploratory Data Analysis', 'Pandas & NumPy', 'Data Visualization'] },
-    { id: 'pd', name: 'Personal Development', subSkills: ['Deep Work Habits', 'Review & Reflect', 'Time Allocation'] },
-  ]
+  // Calendar month state
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear())
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth() + 1)
 
-  const activeSkillObj = skillsList.find((s) => s.name === selectedSkill) || skillsList[0]
+  // Fetch initial dashboard data
+  useEffect(() => {
+    let mounted = true
+
+    // 1. Goals
+    api
+      .get<Goal[]>('/goals')
+      .then((res) => {
+        if (mounted && res && res.length > 0) {
+          setGoals(res)
+          setSelectedGoalId(res[0].id)
+        }
+      })
+      .catch(() => {})
+
+    // 2. Milestones
+    api
+      .get<Milestone[]>('/milestones')
+      .then((res) => {
+        if (mounted && res) {
+          setMilestones(res)
+        }
+      })
+      .catch(() => {})
+
+    // 3. Dashboard Overview
+    api
+      .get<DashboardOverview>('/dashboard/overview')
+      .then((res) => {
+        if (mounted && res) {
+          setOverview(res)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  // Fetch calendar markers when year/month changes
+  useEffect(() => {
+    let mounted = true
+    api
+      .get<CalendarMonthResponse>(`/calendar/events?year=${currentYear}&month=${currentMonth}`)
+      .then((res) => {
+        if (mounted && res && res.events) {
+          const markers: Record<number, { type: string; color: string }> = {}
+          for (const ev of res.events) {
+            try {
+              const dayNum = parseInt(ev.date.split('-')[2], 10)
+              if (!isNaN(dayNum)) {
+                markers[dayNum] = {
+                  type: ev.type === 'milestone' ? 'milestone-ring' : 'dot-only',
+                  color: ev.dot_color || '#00e599',
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+          setCalendarEvents(markers)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      mounted = false
+    }
+  }, [currentYear, currentMonth])
+
+  // Fetch roadmap when goal changes
+  useEffect(() => {
+    if (!selectedGoalId) return
+    let mounted = true
+    api.get<any>(`/goals/${selectedGoalId}/roadmap`)
+      .then((data) => {
+        if (!mounted || !data?.items) return
+        const steps = data.items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          estimated_hours: item.estimated_hours ?? 0,
+          invested_hours: item.invested_hours ?? 0,
+          progress: item.progress ?? 0,
+          children: (item.children || []).map((ch: any) => ({
+            id: ch.id,
+            name: ch.name,
+            estimated_hours: ch.estimated_hours ?? 0,
+            invested_hours: ch.invested_hours ?? 0,
+            progress: ch.progress ?? 0,
+          })),
+        }))
+        setRoadmapSteps(steps)
+        if (steps.length > 0) {
+          setSelectedRoadmapItemId(steps[0].children?.[0]?.id || steps[0].id)
+        }
+      })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [selectedGoalId])
+
+  const selectedGoal = goals.find(g => g.id === selectedGoalId) || goals[0] || null
+  const selectedStep = roadmapSteps.find(s => s.id === selectedRoadmapItemId) || roadmapSteps[0] || null
+
+  const selectedSubSkill = useMemo(() => {
+    for (const step of roadmapSteps) {
+      for (const child of step.children) {
+        if (child.id === selectedRoadmapItemId) return child
+      }
+      if (step.id === selectedRoadmapItemId) return step
+    }
+    return null
+  }, [roadmapSteps, selectedRoadmapItemId])
+
+  // Planned focus duration (max 4 hours = 240 mins)
+  const [plannedMinutes, setPlannedMinutes] = useState<number>(() => {
+    const saved = localStorage.getItem('lifeos_planned_focus_seconds')
+    return saved ? Math.max(5, Math.min(240, Math.round(parseInt(saved, 10) / 60))) : 180
+  })
+  const dialRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+
+  const updateMinutesFromEvent = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!dialRef.current) return
+      const rect = dialRef.current.getBoundingClientRect()
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      const dx = clientX - cx
+      const dy = clientY - cy
+
+      // Angle in degrees where 12 o'clock is 0 degrees, clockwise:
+      let deg = Math.atan2(dy, dx) * (180 / Math.PI) + 90
+      if (deg < 0) deg += 360
+
+      // Map 0 - 360 to 0 - 240 minutes (max 4 hours)
+      const rawMins = (deg / 360) * 240
+      // Snap to nearest 5 minutes
+      let snapped = Math.round(rawMins / 5) * 5
+      if (snapped < 5) {
+        snapped = deg > 345 ? 240 : 5
+      }
+      if (snapped > 240) snapped = 240
+
+      setPlannedMinutes(snapped)
+      setTargetDurationSeconds(snapped * 60)
+    },
+    [setTargetDurationSeconds]
+  )
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+    updateMinutesFromEvent(e.clientX, e.clientY)
+  }
+
+  useEffect(() => {
+    if (!isDragging) return
+    const handleMouseMove = (e: MouseEvent) => {
+      updateMinutesFromEvent(e.clientX, e.clientY)
+    }
+    const handleMouseUp = () => {
+      setIsDragging(false)
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDragging, updateMinutesFromEvent])
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length > 0) {
+      setIsDragging(true)
+      updateMinutesFromEvent(e.touches[0].clientX, e.touches[0].clientY)
+    }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isDragging && e.touches.length > 0) {
+      updateMinutesFromEvent(e.touches[0].clientX, e.touches[0].clientY)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    setIsDragging(false)
+  }
 
   const handleStartFocus = async () => {
     try {
-      await startTimer({ note: `Focusing on ${selectedSkill} - ${selectedSubSkill}` })
+      const targetSecs = plannedMinutes * 60
+      setTargetDurationSeconds(targetSecs)
+      await startTimer(
+        {
+          goal_id: selectedGoalId ?? undefined,
+          department_id: selectedGoal?.department_id ?? undefined,
+          roadmap_item_id: selectedRoadmapItemId ?? undefined,
+          note: `Focusing on ${selectedGoal?.name ?? 'Deep Work'} - ${selectedStep?.name ?? 'General'}`,
+        },
+        targetSecs
+      )
     } catch {
       // ignore
     }
     navigate('/focus')
   }
 
-  // Circular gauge calculations for Progress Overview
-  const progressPercent = 42
+  // Hero banner milestone: nearest upcoming active milestone
+  const nextMilestone = useMemo(() => {
+    const activeWithDates = milestones
+      .filter((m) => m.status !== 'completed' && m.completion_date)
+      .sort((a, b) => new Date(a.completion_date!).getTime() - new Date(b.completion_date!).getTime())
+
+    if (activeWithDates.length > 0) return activeWithDates[0]
+    return milestones.find((m) => m.status !== 'completed') || null
+  }, [milestones])
+
+  const milestoneDueText = useMemo(() => {
+    if (!nextMilestone || !nextMilestone.completion_date) return 'Target scheduled'
+    try {
+      const diff = Math.ceil(
+        (new Date(nextMilestone.completion_date).getTime() - Date.now()) / (1000 * 3600 * 24)
+      )
+      if (diff > 0) return `Due in ${diff} day${diff === 1 ? '' : 's'}`
+      if (diff === 0) return 'Due today'
+      return `Overdue by ${Math.abs(diff)} day${Math.abs(diff) === 1 ? '' : 's'}`
+    } catch {
+      return 'Target scheduled'
+    }
+  }, [nextMilestone])
+
+  // Progress calculations
+  const progressPercent = useMemo(() => {
+    if (goals.length > 0) {
+      const total = goals.reduce((acc, g) => acc + (g.progress || 0), 0)
+      return Math.round(total / goals.length)
+    }
+    return 0
+  }, [goals])
+
   const gaugeSize = 98
   const gaugeStroke = 6.5
   const gaugeRadius = (gaugeSize - gaugeStroke) / 2
@@ -65,16 +316,71 @@ export function Dashboard() {
   const timerRadius = (timerDialSize - timerStroke) / 2
   const timerCircumference = 2 * Math.PI * timerRadius
 
-  // Calendar dates setup (April 2025 starts on Tuesday, Day 1 is under Tue)
-  const daysInApril = Array.from({ length: 30 }, (_, i) => i + 1)
-  
-  const calendarMarkers: Record<number, { type: 'milestone-ring' | 'deadline-ring' | 'active-milestone' | 'active-deadline' | 'dot-only', color: string }> = {
-    8: { type: 'dot-only', color: '#00e599' },
-    10: { type: 'deadline-ring', color: '#8b5cf6' },
-    15: { type: 'milestone-ring', color: '#00e599' },
-    18: { type: 'active-milestone', color: '#00e599' },
-    22: { type: 'deadline-ring', color: '#8b5cf6' },
-    25: { type: 'active-deadline', color: '#8b5cf6' },
+  const dialFraction = Math.max(0.01, Math.min(1, plannedMinutes / 240))
+  const dialOffset = timerCircumference * (1 - dialFraction)
+  const angleDeg = dialFraction * 360
+  const handleAngleRad = ((angleDeg - 90) * Math.PI) / 180
+  const handleX = timerDialSize / 2 + timerRadius * Math.cos(handleAngleRad)
+  const handleY = timerDialSize / 2 + timerRadius * Math.sin(handleAngleRad)
+
+  const plannedHrs = Math.floor(plannedMinutes / 60)
+  const plannedMins = plannedMinutes % 60
+  const digitalTimeStr = `${plannedHrs.toString().padStart(2, '0')}:${plannedMins.toString().padStart(2, '0')}:00`
+  const plannedHoursLabel = `${plannedHrs}h ${plannedMins}m`
+
+  // Dynamic Month Calendar
+  const daysInMonth = useMemo(() => {
+    const total = new Date(currentYear, currentMonth, 0).getDate()
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }, [currentYear, currentMonth])
+
+  const startDayOffset = useMemo(() => {
+    return new Date(currentYear, currentMonth - 1, 1).getDay()
+  }, [currentYear, currentMonth])
+
+  const currentMonthLabel = useMemo(() => {
+    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(
+      new Date(currentYear, currentMonth - 1, 1)
+    )
+  }, [currentYear, currentMonth])
+
+  // Mini time formatted
+  const todaySeconds = summary?.today_seconds || 0
+  const completedHoursStr = `${Math.floor(todaySeconds / 3600)}h ${Math.floor((todaySeconds % 3600) / 60)}m`
+  const totalSeconds = summary?.total_seconds || 0
+  const totalHoursStr = `${Math.floor(totalSeconds / 3600)}h ${Math.floor((totalSeconds % 3600) / 60)}m`
+
+  const totalTimeDisplay = useMemo(() => {
+    if (selectedSubSkill && selectedSubSkill.estimated_hours && selectedSubSkill.estimated_hours > 0) {
+      const inv = selectedSubSkill.invested_hours ?? 0
+      const est = selectedSubSkill.estimated_hours
+      return {
+        label: `${inv}h / ${est}h`,
+        percent: Math.min(100, selectedSubSkill.progress ?? Math.round((inv / est) * 100)),
+      }
+    }
+    return {
+      label: totalHoursStr,
+      percent: Math.min(100, Math.round((totalSeconds / (100 * 3600)) * 100)),
+    }
+  }, [selectedSubSkill, totalHoursStr, totalSeconds])
+
+  const handlePrevCalMonth = () => {
+    if (currentMonth === 1) {
+      setCurrentYear(currentYear - 1)
+      setCurrentMonth(12)
+    } else {
+      setCurrentMonth(currentMonth - 1)
+    }
+  }
+
+  const handleNextCalMonth = () => {
+    if (currentMonth === 12) {
+      setCurrentYear(currentYear + 1)
+      setCurrentMonth(1)
+    } else {
+      setCurrentMonth(currentMonth + 1)
+    }
   }
 
   return (
@@ -104,87 +410,146 @@ export function Dashboard() {
               YOUR NEXT MILESTONE
             </div>
 
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 19,
-                fontWeight: 800,
-                color: '#ffffff',
-                letterSpacing: '-0.02em',
-                lineHeight: 1.25,
-              }}
-            >
-              Complete Machine Learning Basics
-            </h1>
+            {nextMilestone ? (
+              <>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: 19,
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1.25,
+                  }}
+                >
+                  {nextMilestone.name}
+                </h1>
 
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                marginTop: 6,
-                fontSize: 11.5,
-                color: '#8e95a5',
-              }}
-            >
-              <CalendarIcon size={12} color="#4e5564" />
-              <span>Due in 12 days</span>
-              <span style={{ color: '#4e5564' }}>•</span>
-              <span>3/5 skills completed</span>
-            </div>
-
-            {/* Progress Bar & Percentage */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, maxWidth: 330 }}>
-              <div
-                style={{
-                  flex: 1,
-                  height: 5,
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  borderRadius: 2.5,
-                  overflow: 'hidden',
-                }}
-              >
                 <div
                   style={{
-                    width: '60%',
-                    height: '100%',
-                    background: '#00e599',
-                    borderRadius: 2.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    marginTop: 6,
+                    fontSize: 11.5,
+                    color: '#8e95a5',
                   }}
-                />
-              </div>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#ffffff' }}>60%</span>
-            </div>
+                >
+                  <CalendarIcon size={12} color="#4e5564" />
+                  <span>{milestoneDueText}</span>
+                  <span style={{ color: '#4e5564' }}>•</span>
+                  <span>
+                    {nextMilestone.skills_completed_count !== undefined && nextMilestone.skills_total_count !== undefined
+                      ? `${nextMilestone.skills_completed_count}/${nextMilestone.skills_total_count} skills completed`
+                      : nextMilestone.skill_names && nextMilestone.skill_names.length > 0
+                      ? `${nextMilestone.skill_names.length} skills linked`
+                      : '0 skills linked'}
+                  </span>
+                </div>
 
-            {/* View Details Pill Button */}
-            <Link
-              to="/milestones"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                marginTop: 12,
-                padding: '5px 14px',
-                borderRadius: 'var(--radius-full)',
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                fontSize: 11,
-                fontWeight: 600,
-                color: '#ffffff',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#00e599'
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'
-              }}
-            >
-              <span>View Details</span>
-              <ArrowRight size={12} />
-            </Link>
+                {/* Progress Bar & Percentage */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, maxWidth: 330 }}>
+                  <div
+                    style={{
+                      flex: 1,
+                      height: 5,
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      borderRadius: 2.5,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${nextMilestone.progress || 0}%`,
+                        height: '100%',
+                        background: '#00e599',
+                        borderRadius: 2.5,
+                        transition: 'width 0.3s ease',
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: '#ffffff' }}>
+                    {nextMilestone.progress || 0}%
+                  </span>
+                </div>
+
+                {/* View Details Pill Button */}
+                <Link
+                  to="/milestones"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 12,
+                    padding: '5px 14px',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#ffffff',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#00e599'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'
+                  }}
+                >
+                  <span>View Details</span>
+                  <ArrowRight size={12} />
+                </Link>
+              </>
+            ) : (
+              <>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1.25,
+                  }}
+                >
+                  No upcoming milestone scheduled
+                </h1>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 11.5,
+                    color: '#8e95a5',
+                    maxWidth: 420,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Connect your roadmap sub-skills to milestones to track target completion deadlines.
+                </div>
+                <Link
+                  to="/milestones"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 14,
+                    padding: '5px 14px',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'rgba(0, 229, 153, 0.12)',
+                    border: '1px solid rgba(0, 229, 153, 0.3)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#00e599',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <Plus size={12} />
+                  <span>Create Milestone</span>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Right Quote */}
@@ -216,6 +581,11 @@ export function Dashboard() {
               {/* Dial Column */}
               <div className="flow-dial-col">
                 <div
+                  ref={dialRef}
+                  onMouseDown={handleMouseDown}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
                   style={{
                     position: 'relative',
                     width: timerDialSize,
@@ -223,17 +593,27 @@ export function Dashboard() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    userSelect: 'none',
+                    touchAction: 'none',
                   }}
+                  title="Drag the knob or click around the ring to set focus duration (up to 4 hours)"
                 >
-                  <svg width={timerDialSize} height={timerDialSize} style={{ transform: 'rotate(-90deg)' }}>
+                  <svg
+                    width={timerDialSize}
+                    height={timerDialSize}
+                    style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+                  >
+                    {/* Background Track */}
                     <circle
                       cx={timerDialSize / 2}
                       cy={timerDialSize / 2}
                       r={timerRadius}
-                      stroke="rgba(255, 255, 255, 0.05)"
+                      stroke="rgba(255, 255, 255, 0.08)"
                       strokeWidth={timerStroke}
                       fill="none"
                     />
+                    {/* Active Arc (Rotated -90deg to begin at 12 o'clock) */}
                     <circle
                       cx={timerDialSize / 2}
                       cy={timerDialSize / 2}
@@ -242,25 +622,46 @@ export function Dashboard() {
                       strokeWidth={timerStroke}
                       fill="none"
                       strokeDasharray={timerCircumference}
-                      strokeDashoffset={timerCircumference * 0.25}
+                      strokeDashoffset={dialOffset}
                       strokeLinecap="round"
-                      style={{ filter: 'drop-shadow(0 0 6px rgba(0, 229, 153, 0.4))' }}
+                      style={{
+                        transform: 'rotate(-90deg)',
+                        transformOrigin: `${timerDialSize / 2}px ${timerDialSize / 2}px`,
+                        filter: 'drop-shadow(0 0 6px rgba(0, 229, 153, 0.5))',
+                        transition: isDragging ? 'none' : 'stroke-dashoffset 0.1s ease',
+                      }}
+                    />
+                    {/* Draggable Knob Handle */}
+                    <circle
+                      cx={handleX}
+                      cy={handleY}
+                      r={6.5}
+                      fill="#00e599"
+                      stroke="#ffffff"
+                      strokeWidth={2}
+                      style={{
+                        filter: 'drop-shadow(0 0 7px rgba(0, 229, 153, 0.85))',
+                        cursor: isDragging ? 'grabbing' : 'grab',
+                        transition: isDragging ? 'none' : 'cx 0.1s ease, cy 0.1s ease',
+                      }}
                     />
                   </svg>
 
-                  <div style={{ position: 'absolute', textAlign: 'center' }}>
+                  {/* Center Digital Display */}
+                  <div style={{ position: 'absolute', textAlign: 'center', pointerEvents: 'none' }}>
                     <div
                       style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 17,
+                        fontSize: 16.5,
                         fontWeight: 800,
                         color: '#ffffff',
                         letterSpacing: '-0.02em',
+                        lineHeight: 1.1,
                       }}
                     >
-                      03:00:00
+                      {digitalTimeStr}
                     </div>
-                    <div style={{ fontSize: 9.5, color: '#8e95a5', marginTop: 1 }}>
+                    <div style={{ fontSize: 9, color: '#8e95a5', marginTop: 2, fontWeight: 500 }}>
                       Focus Session
                     </div>
                   </div>
@@ -303,11 +704,11 @@ export function Dashboard() {
                 {/* Select Skill Dropdown */}
                 <div style={{ position: 'relative' }}>
                   <label style={{ display: 'block', fontSize: 10, color: '#8e95a5', marginBottom: 3, fontWeight: 500 }}>
-                    Select Skill
+                    Select Focus Track / Skill
                   </label>
                   <button
                     type="button"
-                    onClick={() => setIsSkillDropdownOpen(!isSkillDropdownOpen)}
+                    onClick={() => setIsGoalDropdownOpen(!isGoalDropdownOpen)}
                     style={{
                       width: '100%',
                       display: 'flex',
@@ -323,14 +724,16 @@ export function Dashboard() {
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <Brain size={13} color="#8b5cf6" />
-                      <span>{selectedSkill}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
+                      <Brain size={13} color="#8b5cf6" style={{ flexShrink: 0 }} />
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {selectedGoal?.name || 'Select a goal'}
+                      </span>
                     </div>
-                    <ChevronDown size={12} color="#4e5564" />
+                    <ChevronDown size={12} color="#4e5564" style={{ flexShrink: 0 }} />
                   </button>
 
-                  {isSkillDropdownOpen && (
+                  {isGoalDropdownOpen && (
                     <div
                       style={{
                         position: 'absolute',
@@ -342,27 +745,28 @@ export function Dashboard() {
                         border: '1px solid var(--color-border)',
                         borderRadius: 'var(--radius-sm)',
                         zIndex: 50,
-                        overflow: 'hidden',
+                        maxHeight: 180,
+                        overflowY: 'auto',
                         boxShadow: 'var(--shadow-md)',
                       }}
                     >
-                      {skillsList.map((skill) => (
+                      {goals.map((goal) => (
                         <div
-                          key={skill.id}
+                          key={goal.id}
                           onClick={() => {
-                            setSelectedSkill(skill.name)
-                            setSelectedSubSkill(skill.subSkills[0])
-                            setIsSkillDropdownOpen(false)
+                            setSelectedGoalId(goal.id)
+                            setSelectedRoadmapItemId(null)
+                            setIsGoalDropdownOpen(false)
                           }}
                           style={{
                             padding: '7px 10px',
                             fontSize: 11.5,
-                            color: skill.name === selectedSkill ? '#00e599' : '#ffffff',
+                            color: goal.id === selectedGoalId ? '#00e599' : '#ffffff',
                             cursor: 'pointer',
-                            background: skill.name === selectedSkill ? 'rgba(0, 229, 153, 0.08)' : 'transparent',
+                            background: goal.id === selectedGoalId ? 'rgba(0, 229, 153, 0.08)' : 'transparent',
                           }}
                         >
-                          {skill.name}
+                          {goal.name}
                         </div>
                       ))}
                     </div>
@@ -376,7 +780,7 @@ export function Dashboard() {
                   </label>
                   <button
                     type="button"
-                    onClick={() => setIsSubSkillDropdownOpen(!isSubSkillDropdownOpen)}
+                    onClick={() => setIsStepDropdownOpen(!isStepDropdownOpen)}
                     style={{
                       width: '100%',
                       display: 'flex',
@@ -392,14 +796,16 @@ export function Dashboard() {
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <Zap size={13} color="#8b5cf6" />
-                      <span>{selectedSubSkill}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
+                      <Zap size={13} color="#8b5cf6" style={{ flexShrink: 0 }} />
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {selectedStep?.name || 'Select a step'}
+                      </span>
                     </div>
-                    <ChevronDown size={12} color="#4e5564" />
+                    <ChevronDown size={12} color="#4e5564" style={{ flexShrink: 0 }} />
                   </button>
 
-                  {isSubSkillDropdownOpen && (
+                  {isStepDropdownOpen && (
                     <div
                       style={{
                         position: 'absolute',
@@ -411,26 +817,34 @@ export function Dashboard() {
                         border: '1px solid var(--color-border)',
                         borderRadius: 'var(--radius-sm)',
                         zIndex: 50,
-                        overflow: 'hidden',
+                        maxHeight: 180,
+                        overflowY: 'auto',
                         boxShadow: 'var(--shadow-md)',
                       }}
                     >
-                      {activeSkillObj.subSkills.map((sub) => (
-                        <div
-                          key={sub}
-                          onClick={() => {
-                            setSelectedSubSkill(sub)
-                            setIsSubSkillDropdownOpen(false)
-                          }}
-                          style={{
-                            padding: '7px 10px',
-                            fontSize: 11.5,
-                            color: sub === selectedSubSkill ? '#8b5cf6' : '#ffffff',
-                            cursor: 'pointer',
-                            background: sub === selectedSubSkill ? 'rgba(139, 92, 246, 0.08)' : 'transparent',
-                          }}
-                        >
-                          {sub}
+                      {roadmapSteps.map((step) => (
+                        <div key={`step-${step.id}`}>
+                          <div style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, color: '#8e95a5', background: 'rgba(255, 255, 255, 0.02)' }}>
+                            {step.name}
+                          </div>
+                          {step.children.map((child) => (
+                            <div
+                              key={child.id}
+                              onClick={() => {
+                                setSelectedRoadmapItemId(child.id)
+                                setIsStepDropdownOpen(false)
+                              }}
+                              style={{
+                                padding: '7px 10px 7px 20px',
+                                fontSize: 11.5,
+                                color: child.id === selectedRoadmapItemId ? '#8b5cf6' : '#ffffff',
+                                cursor: 'pointer',
+                                background: child.id === selectedRoadmapItemId ? 'rgba(139, 92, 246, 0.08)' : 'transparent',
+                              }}
+                            >
+                              {child.name}
+                            </div>
+                          ))}
                         </div>
                       ))}
                     </div>
@@ -457,10 +871,10 @@ export function Dashboard() {
                       <span>Planned</span>
                     </div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', marginTop: 1 }}>
-                      3h 0m
+                      {plannedHoursLabel}
                     </div>
                     <div style={{ height: 2.5, background: 'rgba(255, 255, 255, 0.06)', borderRadius: 1.5, marginTop: 3, overflow: 'hidden' }}>
-                      <div style={{ width: '100%', height: '100%', background: '#00e599' }} />
+                      <div style={{ width: `${(plannedMinutes / 240) * 100}%`, height: '100%', background: '#00e599' }} />
                     </div>
                   </div>
 
@@ -471,10 +885,16 @@ export function Dashboard() {
                       <span>Completed</span>
                     </div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', marginTop: 1 }}>
-                      0h 0m
+                      {completedHoursStr}
                     </div>
                     <div style={{ height: 2.5, background: 'rgba(255, 255, 255, 0.06)', borderRadius: 1.5, marginTop: 3, overflow: 'hidden' }}>
-                      <div style={{ width: '0%', height: '100%', background: '#00e599' }} />
+                      <div
+                        style={{
+                          width: `${todaySeconds > 0 ? Math.min(100, Math.round((todaySeconds / (plannedMinutes * 60)) * 100)) : 0}%`,
+                          height: '100%',
+                          background: '#00e599',
+                        }}
+                      />
                     </div>
                   </div>
 
@@ -482,14 +902,13 @@ export function Dashboard() {
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8.5, color: '#4e5564', textTransform: 'uppercase', fontWeight: 700 }}>
                       <CheckCircle2 size={9} />
-                      <span>Total Progress</span>
+                      <span>Total Time</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#ffffff' }}>12h 30m / 40h</span>
-                      <span style={{ fontSize: 9.5, color: '#8e95a5' }}>• 31%</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#ffffff' }}>{totalTimeDisplay.label}</span>
                     </div>
                     <div style={{ height: 2.5, background: 'rgba(255, 255, 255, 0.06)', borderRadius: 1.5, marginTop: 3, overflow: 'hidden' }}>
-                      <div style={{ width: '31%', height: '100%', background: '#00e599' }} />
+                      <div style={{ width: `${totalTimeDisplay.percent}%`, height: '100%', background: '#00e599' }} />
                     </div>
                   </div>
                 </div>
@@ -604,10 +1023,10 @@ export function Dashboard() {
                 </svg>
                 <div style={{ position: 'absolute', textAlign: 'center' }}>
                   <div style={{ fontSize: 19, fontWeight: 800, color: '#ffffff', lineHeight: 1 }}>
-                    42%
+                    {progressPercent}%
                   </div>
                   <div style={{ fontSize: 9.5, color: '#8e95a5', marginTop: 2 }}>
-                    Overall Progress
+                    Avg Goal Progress
                   </div>
                 </div>
               </div>
@@ -615,62 +1034,76 @@ export function Dashboard() {
 
             {/* Skills Progress Breakdown List */}
             <div style={{ display: 'grid', gap: 7 }}>
-              {[
-                { name: 'Machine Learning', hours: '12h 30m / 40h', pct: 31, icon: Brain, color: '#8b5cf6' },
-                { name: 'Web Development', hours: '8h 15m / 30h', pct: 27, icon: Globe, color: '#38bdf8' },
-                { name: 'Data Science', hours: '6h 45m / 25h', pct: 26, icon: LineChart, color: '#00e599' },
-                { name: 'Personal Development', hours: '4h 20m / 20h', pct: 21, icon: Clock, color: '#f59e0b' },
-              ].map((item) => {
-                const Icon = item.icon
-                return (
-                  <div key={item.name} style={{ display: 'grid', gap: 3 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        <div
-                          style={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: 'var(--radius-xs)',
-                            background: `${item.color}15`,
-                            color: item.color,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Icon size={11} />
+              {goals.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '16px 8px', color: '#8e95a5', fontSize: 11.5 }}>
+                  No active goals yet. Create a goal to track your skill progression.
+                </div>
+              ) : (
+                goals.slice(0, 4).map((g, i) => {
+                  const colors = ['#8b5cf6', '#38bdf8', '#00e599', '#f59e0b']
+                  const icons = [Brain, Globe, LineChart, Clock]
+                  const color = colors[i % colors.length]
+                  const Icon = icons[i % icons.length]
+                  const item = {
+                    name: g.name,
+                    hours: `${g.completed_milestones_count || 0}/${g.milestones_count || 0} milestones`,
+                    pct: g.progress || 0,
+                    icon: Icon,
+                    color,
+                  }
+                  return (
+                    <div key={item.name} style={{ display: 'grid', gap: 3 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              width: 20,
+                              height: 20,
+                              borderRadius: 'var(--radius-xs)',
+                              background: `${item.color}15`,
+                              color: item.color,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Icon size={11} />
+                          </div>
+                          <span style={{ color: '#ffffff', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {item.name}
+                          </span>
                         </div>
-                        <span style={{ color: '#ffffff', fontWeight: 500 }}>{item.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{ color: '#8e95a5', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                            {item.hours}
+                          </span>
+                          <span style={{ color: '#8e95a5', fontSize: 10, fontWeight: 600, minWidth: 24, textAlign: 'right' }}>
+                            {item.pct}%
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ color: '#8e95a5', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-                          {item.hours}
-                        </span>
-                        <span style={{ color: '#8e95a5', fontSize: 10, fontWeight: 600, minWidth: 22, textAlign: 'right' }}>
-                          {item.pct}%
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        height: 3,
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: 1.5,
-                        overflow: 'hidden',
-                      }}
-                    >
                       <div
                         style={{
-                          width: `${item.pct}%`,
-                          height: '100%',
-                          background: item.color,
+                          height: 3,
+                          background: 'rgba(255, 255, 255, 0.05)',
                           borderRadius: 1.5,
+                          overflow: 'hidden',
                         }}
-                      />
+                      >
+                        <div
+                          style={{
+                            width: `${item.pct}%`,
+                            height: '100%',
+                            background: item.color,
+                            borderRadius: 1.5,
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              )}
             </div>
           </div>
         </div>
@@ -693,61 +1126,71 @@ export function Dashboard() {
             </div>
 
             <div style={{ display: 'grid', gap: 7, marginTop: 10 }}>
-              {[
-                { title: 'Become a Machine Learning Engineer', skills: '3/5 skills completed', pct: 60, icon: Brain, badgeBg: '#8b5cf6' },
-                { title: 'Build a Web Application', skills: '2/6 skills completed', pct: 33, icon: Code, badgeBg: '#00e599' },
-                { title: 'Improve Physical Health', skills: '1/5 skills completed', pct: 20, icon: Heart, badgeBg: '#f43f5e' },
-              ].map((goal) => {
-                const Icon = goal.icon
-                return (
-                  <div
-                    key={goal.title}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '7px 10px',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.05)',
-                      borderRadius: 'var(--radius-sm)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 'var(--radius-sm)',
-                          background: `${goal.badgeBg}18`,
-                          color: goal.badgeBg,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Icon size={14} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11.5, fontWeight: 600, color: '#ffffff', lineHeight: 1.2 }}>{goal.title}</div>
-                        <div style={{ fontSize: 9.5, color: '#4e5564', marginTop: 1 }}>
-                          {goal.skills}
+              {goals.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px 12px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)', border: '1px dashed rgba(255, 255, 255, 0.08)' }}>
+                  <div style={{ fontSize: 12, color: '#8e95a5', marginBottom: 6 }}>No goals yet</div>
+                  <Link to="/goals" style={{ fontSize: 11, color: '#00e599', fontWeight: 600, textDecoration: 'none' }}>
+                    Create your first goal →
+                  </Link>
+                </div>
+              ) : (
+                goals.slice(0, 3).map((goal, i) => {
+                  const icons = [Brain, Code, Heart, BarChart3]
+                  const colors = ['#8b5cf6', '#00e599', '#f43f5e', '#38bdf8']
+                  const Icon = icons[i % icons.length]
+                  const badgeBg = colors[i % colors.length]
+                  return (
+                    <div
+                      key={goal.id || goal.name}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '7px 10px',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderRadius: 'var(--radius-sm)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 'var(--radius-sm)',
+                            background: `${badgeBg}18`,
+                            color: badgeBg,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon size={14} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 11.5, fontWeight: 600, color: '#ffffff', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {goal.name}
+                          </div>
+                          <div style={{ fontSize: 9.5, color: '#4e5564', marginTop: 1 }}>
+                            {`${goal.completed_milestones_count || 0}/${goal.milestones_count || 0} milestones completed`}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <div style={{ width: 56, height: 3.5, background: 'rgba(255, 255, 255, 0.06)', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ width: `${goal.pct}%`, height: '100%', background: '#00e599' }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 8 }}>
+                        <div style={{ width: 56, height: 3.5, background: 'rgba(255, 255, 255, 0.06)', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ width: `${goal.progress || 0}%`, height: '100%', background: '#00e599' }} />
+                        </div>
+                        <span style={{ fontSize: 10.5, fontWeight: 700, color: '#8e95a5', minWidth: 24, textAlign: 'right' }}>
+                          {goal.progress || 0}%
+                        </span>
+                        <ChevronRight size={12} color="#4e5564" />
                       </div>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, color: '#8e95a5', minWidth: 24, textAlign: 'right' }}>
-                        {goal.pct}%
-                      </span>
-                      <ChevronRight size={12} color="#4e5564" />
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              )}
             </div>
           </div>
 
@@ -764,39 +1207,51 @@ export function Dashboard() {
             </div>
 
             <div style={{ display: 'grid', gap: 9, marginTop: 10 }}>
-              {[
-                { title: 'Completed 1h of Neural Networks', date: 'Apr 18, 2025 • 3:42 PM', dotColor: '#00e599' },
-                { title: 'Added new milestone', subtitle: 'Finish Python Basics by Apr 25, 2025', date: 'Apr 17, 2025 • 10:21 AM', dotColor: '#8b5cf6' },
-                { title: 'Journal Entry', subtitle: 'What I learned today and next steps...', date: 'Apr 16, 2025 • 8:17 PM', dotColor: '#f43f5e' },
-                { title: 'Completed 2h of Web Development', date: 'Apr 16, 2025 • 4:03 PM', dotColor: '#00e599' },
-              ].map((act, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: act.dotColor,
-                      marginTop: 4,
-                      flexShrink: 0,
-                      boxShadow: `0 0 5px ${act.dotColor}80`,
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11.5, color: '#ffffff', fontWeight: 500, lineHeight: 1.25 }}>
-                      {act.title}
-                    </div>
-                    {act.subtitle && (
-                      <div style={{ fontSize: 10.5, color: '#8e95a5', marginTop: 1 }}>
-                        {act.subtitle}
+              {overview?.recent_activity && overview.recent_activity.length > 0 ? (
+                overview.recent_activity.slice(0, 4).map((act: { entity_name: string; field_name: string; new_value: string | null; changed_at: string }, idx: number) => {
+                  const title = `Updated ${act.entity_name} (${act.field_name})`
+                  const subtitle = act.new_value ? `Changed to: ${act.new_value}` : undefined
+                  const date = new Date(act.changed_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })
+                  const dotColor = '#00e599'
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: dotColor,
+                          marginTop: 4,
+                          flexShrink: 0,
+                          boxShadow: `0 0 5px ${dotColor}80`,
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11.5, color: '#ffffff', fontWeight: 500, lineHeight: 1.25 }}>
+                          {title}
+                        </div>
+                        {subtitle && (
+                          <div style={{ fontSize: 10.5, color: '#8e95a5', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {subtitle}
+                          </div>
+                        )}
+                        <div style={{ fontSize: 9.5, color: '#4e5564', marginTop: 1 }}>
+                          {date}
+                        </div>
                       </div>
-                    )}
-                    <div style={{ fontSize: 9.5, color: '#4e5564', marginTop: 1 }}>
-                      {act.date}
                     </div>
-                  </div>
+                  )
+                })
+              ) : (
+                <div style={{ textAlign: 'center', padding: '24px 12px', color: '#8e95a5', fontSize: 11.5 }}>
+                  No recent activity yet. Start a focus session to record your progress.
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -810,16 +1265,18 @@ export function Dashboard() {
         <div className="flow-card">
           <div style={{ fontSize: 14.5, fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>Calendar</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#8e95a5' }}>April 2025</span>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#8e95a5' }}>{currentMonthLabel}</span>
             <div style={{ display: 'flex', gap: 2 }}>
               <button
                 type="button"
+                onClick={handlePrevCalMonth}
                 style={{ background: 'transparent', border: 'none', padding: 2, color: '#4e5564', cursor: 'pointer' }}
               >
                 <ChevronLeft size={13} />
               </button>
               <button
                 type="button"
+                onClick={handleNextCalMonth}
                 style={{ background: 'transparent', border: 'none', padding: 2, color: '#4e5564', cursor: 'pointer' }}
               >
                 <ChevronRight size={13} />
@@ -844,7 +1301,7 @@ export function Dashboard() {
             ))}
           </div>
 
-          {/* Day Numbers Grid (April 2025 starts on Tuesday) */}
+          {/* Day Numbers Grid */}
           <div
             style={{
               display: 'grid',
@@ -854,41 +1311,31 @@ export function Dashboard() {
               fontSize: 10.5,
             }}
           >
-            {/* March padding days */}
-            <div style={{ color: 'rgba(255, 255, 255, 0.08)', height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>30</div>
-            <div style={{ color: 'rgba(255, 255, 255, 0.08)', height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>31</div>
+            {/* Start day padding */}
+            {Array.from({ length: startDayOffset }).map((_, i) => (
+              <div key={`pad-${i}`} style={{ color: 'rgba(255, 255, 255, 0.08)', height: 24 }} />
+            ))}
 
-            {daysInApril.map((day) => {
-              const marker = calendarMarkers[day]
-              const isDotOnly = marker?.type === 'dot-only'
-              const isMilestoneRing = marker?.type === 'milestone-ring'
-              const isDeadlineRing = marker?.type === 'deadline-ring'
-              const isActiveMilestone = marker?.type === 'active-milestone'
-              const isActiveDeadline = marker?.type === 'active-deadline'
+            {daysInMonth.map((day) => {
+              const marker = calendarEvents[day]
+              const isToday =
+                day === new Date().getDate() &&
+                currentMonth === new Date().getMonth() + 1 &&
+                currentYear === new Date().getFullYear()
 
-              let bg = 'transparent'
-              let color = '#8e95a5'
-              let border = '1px solid transparent'
+              let bg = isToday ? 'rgba(0, 229, 153, 0.15)' : 'transparent'
+              let color = isToday ? '#00e599' : '#8e95a5'
+              let border = isToday ? '1px solid #00e599' : '1px solid transparent'
 
-              if (isActiveMilestone) {
-                bg = '#00e599'
-                color = '#080b11'
-              } else if (isActiveDeadline) {
-                bg = '#8b5cf6'
-                color = '#ffffff'
-              } else if (isMilestoneRing) {
+              if (marker?.type === 'milestone-ring') {
                 border = '1px solid #00e599'
                 color = '#00e599'
-              } else if (isDeadlineRing) {
-                border = '1px solid #8b5cf6'
-                color = '#8b5cf6'
-              } else if (isDotOnly) {
-                color = '#ffffff'
               }
 
               return (
                 <div
                   key={day}
+                  onClick={() => navigate('/calendar')}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -909,14 +1356,13 @@ export function Dashboard() {
                       background: bg,
                       color,
                       border,
-                      fontWeight: marker ? 700 : 500,
+                      fontWeight: isToday || marker ? 700 : 500,
                       fontSize: 10.5,
                       lineHeight: 1,
                     }}
                   >
                     {day}
                   </div>
-                  {/* Indicator dot beneath marked dates */}
                   {marker && (
                     <div
                       style={{
@@ -969,57 +1415,78 @@ export function Dashboard() {
           </div>
 
           <div style={{ display: 'grid', gap: 7 }}>
-            {[
-              { dateMonth: 'APR', dateDay: '25', title: 'Finish Python Basics', category: 'Machine Learning', dotColor: '#00e599' },
-              { dateMonth: 'APR', dateDay: '30', title: 'Build Portfolio Website', category: 'Web Development', dotColor: '#00e599' },
-              { dateMonth: 'MAY', dateDay: '10', title: 'Complete Data Analysis Project', category: 'Data Science', dotColor: '#8b5cf6' },
-              { dateMonth: 'MAY', dateDay: '20', title: 'Review and Reflect', category: 'Personal Development', dotColor: '#f59e0b' },
-            ].map((m, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '6px 9px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.04)',
-                }}
-              >
-                <div
-                  style={{
-                    width: 32,
-                    textAlign: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <div style={{ fontSize: 8.5, fontWeight: 800, color: '#4e5564', letterSpacing: '0.04em' }}>{m.dateMonth}</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#ffffff', lineHeight: 1.1 }}>{m.dateDay}</div>
-                </div>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: m.dotColor, flexShrink: 0 }} />
+            {(() => {
+              const activeUpcoming = milestones.filter((m) => m.status !== 'completed')
+              if (activeUpcoming.length === 0) {
+                return (
+                  <div style={{ textAlign: 'center', padding: '20px 8px', color: '#8e95a5', fontSize: 11.5 }}>
+                    No upcoming milestones scheduled.
+                  </div>
+                )
+              }
+              return activeUpcoming.slice(0, 4).map((m, idx) => {
+                const colors = ['#00e599', '#8b5cf6', '#38bdf8', '#f59e0b']
+                let dateMonth = 'DUE'
+                let dateDay = '—'
+                if (m.completion_date) {
+                  try {
+                    const d = new Date(m.completion_date)
+                    dateMonth = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
+                    dateDay = String(d.getDate())
+                  } catch {
+                    // ignore
+                  }
+                }
+                const dotColor = colors[idx % colors.length]
+                const category = m.skill_names && m.skill_names.length > 0 ? m.skill_names.join(', ') : 'Track Goal'
+                return (
+                  <div
+                    key={m.id || idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '6px 9px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.04)',
+                    }}
+                  >
                     <div
                       style={{
-                        fontSize: 11.5,
-                        fontWeight: 600,
-                        color: '#ffffff',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
+                        width: 32,
+                        textAlign: 'center',
+                        flexShrink: 0,
                       }}
                     >
-                      {m.title}
+                      <div style={{ fontSize: 8.5, fontWeight: 800, color: '#4e5564', letterSpacing: '0.04em' }}>{dateMonth}</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#ffffff', lineHeight: 1.1 }}>{dateDay}</div>
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                        <div
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            color: '#ffffff',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {m.name}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 9.5, color: '#8e95a5', marginTop: 1, paddingLeft: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {category}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ fontSize: 9.5, color: '#8e95a5', marginTop: 1, paddingLeft: 10 }}>
-                    {m.category}
-                  </div>
-                </div>
-              </div>
-            ))}
+                )
+              })
+            })()}
           </div>
         </div>
 

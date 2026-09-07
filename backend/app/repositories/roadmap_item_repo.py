@@ -25,6 +25,13 @@ async def get_for_user(session: AsyncSession, item_id: int, user_id: int) -> Roa
     return result.scalar_one_or_none()
 
 
+async def list_children(session: AsyncSession, parent_id: int) -> list[RoadmapItem]:
+    result = await session.execute(
+        select(RoadmapItem).where(RoadmapItem.parent_id == parent_id)
+    )
+    return list(result.scalars())
+
+
 async def create(session: AsyncSession, roadmap_id: int, **fields) -> RoadmapItem:
     item = RoadmapItem(roadmap_id=roadmap_id, **fields)
     session.add(item)

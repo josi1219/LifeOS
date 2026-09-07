@@ -17,6 +17,20 @@ async def get_roadmap_or_404(session: AsyncSession, roadmap_id: int, user_id: in
     return roadmap
 
 
+async def get_or_create_for_goal(session: AsyncSession, goal_id: int, user_id: int) -> Roadmap:
+    roadmap = await roadmap_repo.get_by_goal_for_user(session, goal_id, user_id)
+    if roadmap is not None:
+        return roadmap
+    from app.repositories import goal_repo
+    goal = await goal_repo.get_for_user(session, goal_id, user_id)
+    if goal is None:
+        raise NotFoundError()
+    roadmap = await roadmap_repo.create(
+        session, department_id=goal.department_id, goal_id=goal.id, name=f"{goal.name} Roadmap"
+    )
+    return roadmap
+
+
 async def create_roadmap(session: AsyncSession, department_id: int, data: RoadmapCreate) -> Roadmap:
     fields = data.model_dump()
     return await roadmap_repo.create(session, department_id=department_id, **fields)

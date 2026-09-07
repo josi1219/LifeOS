@@ -5,13 +5,14 @@ from app.api.deps import get_current_user, get_db
 from app.models.user import User
 from app.schemas.roadmap_item import (
     PrerequisiteRequest,
+    ReorderRequest,
     RoadmapItemCreate,
     RoadmapItemResponse,
     RoadmapItemTreeResponse,
     RoadmapItemUpdate,
 )
 from app.services import roadmap_item_service, roadmap_service
-from app.services.errors import NotFoundError
+from app.services.errors import NotFoundError, ValidationError
 
 router = APIRouter(prefix="/api", tags=["roadmap-items"])
 
@@ -42,9 +43,11 @@ async def create_roadmap_item(
 ) -> RoadmapItemResponse:
     try:
         await roadmap_service.get_roadmap_or_404(session, roadmap_id, current_user.id)
+        item = await roadmap_item_service.create_item(session, roadmap_id, payload)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Roadmap not found") from exc
-    item = await roadmap_item_service.create_item(session, roadmap_id, payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message) from exc
     await session.commit()
     return RoadmapItemResponse(
         id=item.id,
@@ -60,6 +63,22 @@ async def create_roadmap_item(
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
+
+
+@router.patch("/roadmaps/{roadmap_id}/items/reorder", response_model=list[RoadmapItemResponse])
+async def reorder_roadmap_items(
+    roadmap_id: int,
+    payload: ReorderRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> list[RoadmapItemResponse]:
+    try:
+        await roadmap_service.get_roadmap_or_404(session, roadmap_id, current_user.id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Roadmap not found") from exc
+    items = await roadmap_item_service.reorder_items(session, roadmap_id, payload.ordered_ids)
+    await session.commit()
+    return [await roadmap_item_service.get_item_response(session, item) for item in items]
 
 
 @router.get("/roadmap-items/{item_id}", response_model=RoadmapItemResponse)
@@ -84,9 +103,11 @@ async def update_roadmap_item(
 ) -> RoadmapItemResponse:
     try:
         item = await roadmap_item_service.get_item_or_404(session, item_id, current_user.id)
+        item = await roadmap_item_service.update_item(session, item, payload)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Roadmap item not found") from exc
-    item = await roadmap_item_service.update_item(session, item, payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message) from exc
     await session.commit()
     return await roadmap_item_service.get_item_response(session, item)
 

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { api } from '../api/client'
 import {
   Archive,
   ArrowLeft,
@@ -264,6 +265,51 @@ export function GoalsView() {
   const activeGoals = goals.filter((g) => g.status === 'active')
   const completedGoals = goals.filter((g) => g.status === 'completed')
 
+  // Fetch real goals from backend on mount
+  useEffect(() => {
+    api
+      .get<any[]>('/goals')
+      .then((backendGoals) => {
+        if (backendGoals && backendGoals.length > 0) {
+          const mapped: Goal[] = backendGoals.map((bg) => {
+            const cat = bg.department_name || 'Career'
+            const iconComp =
+              cat === 'Career' ? Brain : cat === 'Finance' ? BarChart3 : cat === 'Health' ? Dumbbell : BookOpen
+            return {
+              id: String(bg.id),
+              title: bg.name,
+              category: cat,
+              description: bg.description || bg.why || 'Custom goal track with milestone objectives.',
+              dueDate: bg.target_date
+                ? new Date(bg.target_date).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })
+                : 'Dec 31, 2025',
+              progress: bg.progress || 0,
+              timeInvested: '0h',
+              totalTime: '100h',
+              status: bg.status === 'completed' ? 'completed' : 'active',
+              icon: iconComp,
+              linkedRoadmap: {
+                title: `${bg.name} Roadmap`,
+                skillsCount: bg.milestones_count || 4,
+                completedSkillsCount: bg.completed_milestones_count || 0,
+                route: '/roadmap',
+              },
+              milestones: [],
+            }
+          })
+          setGoals(mapped)
+          setSelectedGoalId(mapped[0].id)
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load goals from backend', err)
+      })
+  }, [])
+
   const handleOpenEditModal = () => {
     if (!selectedGoal) return
     setEditTitle(selectedGoal.title)
@@ -274,8 +320,18 @@ export function GoalsView() {
     setIsEditGoalModalOpen(true)
   }
 
-  const handleSaveEditedGoal = () => {
+  const handleSaveEditedGoal = async () => {
     if (!selectedGoal) return
+    try {
+      if (!isNaN(Number(selectedGoal.id))) {
+        await api.patch('/goals/' + selectedGoal.id, {
+          name: editTitle,
+          description: editDesc,
+        })
+      }
+    } catch (err) {
+      console.error('Failed to save edited goal', err)
+    }
     setGoals((prev) =>
       prev.map((g) =>
         g.id === selectedGoal.id
@@ -293,9 +349,16 @@ export function GoalsView() {
     setIsEditGoalModalOpen(false)
   }
 
-  const handleDeleteGoal = () => {
+  const handleDeleteGoal = async () => {
     if (!selectedGoal) return
     if (window.confirm(`Are you sure you want to permanently delete "${selectedGoal.title}"?`)) {
+      try {
+        if (!isNaN(Number(selectedGoal.id))) {
+          await api.delete('/goals/' + selectedGoal.id)
+        }
+      } catch (err) {
+        console.error('Failed to delete goal', err)
+      }
       const remaining = goals.filter((g) => g.id !== selectedGoal.id)
       setGoals(remaining)
       if (remaining.length > 0) {
@@ -304,18 +367,43 @@ export function GoalsView() {
     }
   }
 
-  const handleToggleArchiveGoal = () => {
+  const handleToggleArchiveGoal = async () => {
     if (!selectedGoal) return
     const nextStatus = selectedGoal.status === 'active' ? 'completed' : 'active'
+    try {
+      if (!isNaN(Number(selectedGoal.id))) {
+        await api.patch('/goals/' + selectedGoal.id, { status: nextStatus })
+      }
+    } catch (err) {
+      console.error('Failed to update status', err)
+    }
     setGoals((prev) =>
-      prev.map((g) => (g.id === selectedGoal.id ? { ...g, status: nextStatus, progress: nextStatus === 'completed' ? 100 : g.progress } : g))
+      prev.map((g) =>
+        g.id === selectedGoal.id
+          ? { ...g, status: nextStatus, progress: nextStatus === 'completed' ? 100 : g.progress }
+          : g
+      )
     )
   }
 
-  const handleCreateNewGoal = () => {
+  const handleCreateNewGoal = async () => {
     if (!newTitle.trim()) return
+    let createdId = `goal-${Date.now()}`
+    try {
+      const created = await api.post<any>('/goals', {
+        name: newTitle.trim(),
+        description: newDesc.trim() || undefined,
+        why: newDesc.trim() || undefined,
+      })
+      if (created && created.id) {
+        createdId = String(created.id)
+      }
+    } catch (err) {
+      console.error('Failed to create goal in backend', err)
+    }
+
     const newGoalObj: Goal = {
-      id: `goal-${Date.now()}`,
+      id: createdId,
       title: newTitle.trim(),
       category: newCategory,
       description: newDesc.trim() || 'Custom goal track with milestone objectives.',
@@ -324,7 +412,14 @@ export function GoalsView() {
       timeInvested: '0h 0m',
       totalTime: newTotalTime,
       status: 'active',
-      icon: newCategory === 'Career' ? Brain : newCategory === 'Finance' ? BarChart3 : newCategory === 'Health' ? Dumbbell : BookOpen,
+      icon:
+        newCategory === 'Career'
+          ? Brain
+          : newCategory === 'Finance'
+          ? BarChart3
+          : newCategory === 'Health'
+          ? Dumbbell
+          : BookOpen,
       linkedRoadmap: {
         title: `${newTitle.trim()} Roadmap`,
         skillsCount: 4,

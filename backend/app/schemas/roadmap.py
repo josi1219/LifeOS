@@ -13,6 +13,9 @@ class RoadmapUpdate(BaseModel):
     goal_id: int | None = None
 
 
+from app.schemas.roadmap_item import RoadmapItemTreeResponse
+
+
 class RoadmapResponse(BaseModel):
     id: int
     department_id: int
@@ -22,3 +25,11 @@ class RoadmapResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class GoalRoadmapDetailResponse(BaseModel):
+    roadmap: RoadmapResponse
+    items: list[RoadmapItemTreeResponse] = []
+    total_steps: int = 0
+    completed_steps: int = 0
+    progress: int = 0

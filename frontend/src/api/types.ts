@@ -21,6 +21,7 @@ export interface Department {
 export interface Goal {
   id: number
   department_id: number
+  department_name?: string | null
   name: string
   description: string | null
   why: string | null
@@ -28,6 +29,9 @@ export interface Goal {
   priority: number
   target_date: string | null
   status: string
+  progress?: number
+  milestones_count?: number
+  completed_milestones_count?: number
   created_at: string
   updated_at: string
 }
@@ -60,6 +64,39 @@ export interface RoadmapItemTree extends RoadmapItem {
   children: RoadmapItemTree[]
 }
 
+export interface GoalRoadmapDetail {
+  roadmap: Roadmap
+  items: RoadmapItemTree[]
+  total_steps: number
+  completed_steps: number
+  progress: number
+}
+
+export interface CalendarEventItem {
+  id: string
+  title: string
+  type: string
+  date: string
+  time: string
+  duration: string
+  dot_color: string
+}
+
+export interface UpcomingMilestoneSummary {
+  id: number
+  title: string
+  date: string
+  progress: number
+  dot_color: string
+}
+
+export interface CalendarMonthResponse {
+  year: number
+  month: number
+  events: CalendarEventItem[]
+  upcoming_milestones: UpcomingMilestoneSummary[]
+}
+
 export interface Skill {
   id: number
   department_id: number
@@ -82,6 +119,10 @@ export interface Milestone {
   status: string
   progress: number
   completion_date: string | null
+  skill_ids?: number[]
+  skill_names?: string[]
+  skills_completed_count?: number
+  skills_total_count?: number
   created_at: string
   updated_at: string
 }

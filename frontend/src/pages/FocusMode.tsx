@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTimer } from '../features/timer/TimerContext'
 import './FocusMode.css'
@@ -9,6 +9,7 @@ export function FocusMode() {
     activeSession,
     status,
     elapsedSeconds,
+    targetDurationSeconds,
     pauseTimer,
     resumeTimer,
   } = useTimer()
@@ -27,10 +28,21 @@ export function FocusMode() {
     return () => clearInterval(timer)
   }, [])
 
+  // Planned target duration set from dial or active session
+  const targetSeconds = activeSession?.duration_seconds && activeSession.duration_seconds > 0
+    ? activeSession.duration_seconds
+    : (targetDurationSeconds || 3 * 3600)
+
   // Local fallback timer when no backend session is active (e.g. previewing focus mode)
-  // 02:17:36 = 2*3600 + 17*60 + 36 = 8256 seconds
-  const [localRemaining, setLocalRemaining] = useState(8256)
+  const [localRemaining, setLocalRemaining] = useState(() => targetSeconds)
   const [localPaused, setLocalPaused] = useState(false)
+
+  // Keep localRemaining in sync if targetDurationSeconds changes
+  useEffect(() => {
+    if (!activeSession) {
+      setLocalRemaining(targetSeconds)
+    }
+  }, [targetSeconds, activeSession])
 
   const isPaused = activeSession ? status === 'paused' : localPaused
 
@@ -44,9 +56,6 @@ export function FocusMode() {
     }, 1000)
     return () => clearInterval(interval)
   }, [activeSession, localPaused])
-
-  // Total session target duration (default: 3 hours = 10,800s)
-  const targetSeconds = activeSession?.duration_seconds || 3 * 3600
 
   // Calculate actual remaining seconds
   const remainingSeconds = useMemo(() => {
@@ -111,8 +120,8 @@ export function FocusMode() {
   const headY = center + radius * Math.sin(arcAngleRad)
 
   // Display skill & sub-skill name
-  const skillName = activeSession?.skill_name || 'Machine Learning'
-  const subSkillName = activeSession?.roadmap_item_name || activeSession?.note || 'Feature Engineering'
+  const skillName = activeSession?.goal_name || activeSession?.skill_name || 'Deep Focus'
+  const subSkillName = activeSession?.roadmap_item_name || activeSession?.note || 'Focus Session'
 
   return (
     <div className="flow-focus-screen">

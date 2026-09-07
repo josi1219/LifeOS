@@ -10,6 +10,43 @@ from app.services.errors import NotFoundError
 router = APIRouter(prefix="/api", tags=["milestones"])
 
 
+@router.get("/milestones", response_model=list[MilestoneResponse])
+async def list_user_milestones(
+    goal_id: int | None = None,
+    department_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> list[MilestoneResponse]:
+    milestones = await milestone_service.list_milestones_for_user(
+        session, current_user.id, goal_id=goal_id, department_id=department_id
+    )
+    return [await milestone_service.enrich_milestone_response(session, m) for m in milestones]
+
+
+@router.post("/milestones", response_model=MilestoneResponse, status_code=status.HTTP_201_CREATED)
+async def create_user_milestone(
+    payload: MilestoneCreate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> MilestoneResponse:
+    dept_id = payload.department_id
+    if dept_id is None and payload.goal_id is not None:
+        from app.repositories import goal_repo
+        goal = await goal_repo.get_for_user(session, payload.goal_id, current_user.id)
+        if goal:
+            dept_id = goal.department_id
+    if dept_id is None:
+        from app.repositories import department_repo
+        user_depts = await department_repo.list_for_user(session, current_user.id)
+        if user_depts:
+            dept_id = user_depts[0].id
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No department available for milestone")
+    milestone = await milestone_service.create_milestone(session, dept_id, payload)
+    await session.commit()
+    return await milestone_service.enrich_milestone_response(session, milestone)
+
+
 @router.get("/departments/{department_id}/milestones", response_model=list[MilestoneResponse])
 async def list_milestones(
     department_id: int,
@@ -21,7 +58,7 @@ async def list_milestones(
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found") from exc
     milestones = await milestone_service.list_milestones(session, department_id)
-    return [MilestoneResponse.model_validate(m) for m in milestones]
+    return [await milestone_service.enrich_milestone_response(session, m) for m in milestones]
 
 
 @router.post(
@@ -41,7 +78,7 @@ async def create_milestone(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found") from exc
     milestone = await milestone_service.create_milestone(session, department_id, payload)
     await session.commit()
-    return MilestoneResponse.model_validate(milestone)
+    return await milestone_service.enrich_milestone_response(session, milestone)
 
 
 @router.get("/milestones/{milestone_id}", response_model=MilestoneResponse)
@@ -54,7 +91,7 @@ async def get_milestone(
         milestone = await milestone_service.get_milestone_or_404(session, milestone_id, current_user.id)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Milestone not found") from exc
-    return MilestoneResponse.model_validate(milestone)
+    return await milestone_service.enrich_milestone_response(session, milestone)
 
 
 @router.patch("/milestones/{milestone_id}", response_model=MilestoneResponse)
@@ -70,7 +107,7 @@ async def update_milestone(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Milestone not found") from exc
     milestone = await milestone_service.update_milestone(session, milestone, payload)
     await session.commit()
-    return MilestoneResponse.model_validate(milestone)
+    return await milestone_service.enrich_milestone_response(session, milestone)
 
 
 @router.delete("/milestones/{milestone_id}", status_code=status.HTTP_204_NO_CONTENT)

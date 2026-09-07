@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class GoalCreate(BaseModel):
     name: str = Field(min_length=1, max_length=160)
+    department_id: int | None = None
     description: str | None = None
     why: str | None = None
     success_definition: str | None = None
@@ -26,6 +27,7 @@ class GoalUpdate(BaseModel):
 class GoalResponse(BaseModel):
     id: int
     department_id: int
+    department_name: str | None = None
     name: str
     description: str | None
     why: str | None
@@ -33,6 +35,9 @@ class GoalResponse(BaseModel):
     priority: int
     target_date: date | None
     status: str
+    progress: int = 0
+    milestones_count: int = 0
+    completed_milestones_count: int = 0
     created_at: datetime
     updated_at: datetime
 

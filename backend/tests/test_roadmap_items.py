@@ -75,3 +75,45 @@ async def test_delete_item(client: AsyncClient):
 
     assert (await client.delete(f"/api/roadmap-items/{item['id']}", headers=headers)).status_code == 204
     assert (await client.get(f"/api/roadmap-items/{item['id']}", headers=headers)).status_code == 404
+
+
+async def test_reorder_items(client: AsyncClient):
+    headers, roadmap = await _setup(client)
+    item1 = (await client.post(f"/api/roadmaps/{roadmap['id']}/items", json={"name": "Step 1"}, headers=headers)).json()
+    item2 = (await client.post(f"/api/roadmaps/{roadmap['id']}/items", json={"name": "Step 2"}, headers=headers)).json()
+    item3 = (await client.post(f"/api/roadmaps/{roadmap['id']}/items", json={"name": "Step 3"}, headers=headers)).json()
+
+    # Reverse the order
+    res = await client.patch(
+        f"/api/roadmaps/{roadmap['id']}/items/reorder",
+        json={"ordered_ids": [item3["id"], item1["id"], item2["id"]]},
+        headers=headers,
+    )
+    assert res.status_code == 200
+    reordered = res.json()
+    assert len(reordered) == 3
+    assert reordered[0]["id"] == item3["id"]
+    assert reordered[0]["sort_order"] == 0
+    assert reordered[1]["id"] == item1["id"]
+    assert reordered[1]["sort_order"] == 1
+    assert reordered[2]["id"] == item2["id"]
+    assert reordered[2]["sort_order"] == 2
+
+
+async def test_cascade_delete_children(client: AsyncClient):
+    headers, roadmap = await _setup(client)
+    parent = (await client.post(
+        f"/api/roadmaps/{roadmap['id']}/items", json={"name": "Parent Step"}, headers=headers
+    )).json()
+    child = (await client.post(
+        f"/api/roadmaps/{roadmap['id']}/items", json={"name": "Sub Skill", "parent_id": parent["id"]}, headers=headers
+    )).json()
+
+    # Delete parent
+    res = await client.delete(f"/api/roadmap-items/{parent['id']}", headers=headers)
+    assert res.status_code == 204
+
+    # Child should be gone
+    res_child = await client.get(f"/api/roadmap-items/{child['id']}", headers=headers)
+    assert res_child.status_code == 404
+

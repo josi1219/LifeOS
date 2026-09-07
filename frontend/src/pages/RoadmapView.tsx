@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { api } from '../api/client'
 import {
   ArrowLeft,
   Brain,
@@ -9,17 +10,14 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
-  Cloud,
   Code,
   Edit2,
   Edit3,
   Flag,
-  Heart,
   Layers,
   Layout,
   Play,
   Plus,
-  Settings as SettingsIcon,
   Target,
   Trash2,
   X,
@@ -71,7 +69,8 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
 
   // View mode: 'roadmap' (Main Timeline) or 'skill-detail' (Expanded Skill & Sub-Skills)
   const [viewMode, setViewMode] = useState<'roadmap' | 'skill-detail'>('roadmap')
-  const [selectedSkillId, setSelectedSkillId] = useState('python')
+  const [selectedSkillId, setSelectedSkillId] = useState('')
+  const [draggedStepId, setDraggedStepId] = useState<string | null>(null)
 
   // Modals & dropdowns
   const [isGoalDropdownOpen, setIsGoalDropdownOpen] = useState(false)
@@ -98,493 +97,125 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
   const [newSubSkillHours, setNewSubSkillHours] = useState('10')
 
   // Goals Catalog with unique, distinct sub-skills per step
-  const [goals, setGoals] = useState<GoalData[]>([
-    {
-      id: 'ml',
-      title: 'Become a Machine Learning Engineer',
-      description:
-        'Master the core skills, build real projects, and gain hands-on experience to become a professional ML engineer.',
-      targetDate: 'Dec 31, 2025',
-      totalProgress: 32,
-      timeInvested: '124h 30m',
-      steps: [
-        {
-          id: 'python',
-          stepNumber: 1,
-          name: 'Python Fundamentals',
-          description:
-            'Learn Python basics, data structures, functions, OOP and file handling. Build small projects to apply what you learn.',
-          status: 'completed',
-          progress: 100,
-          investedHours: '45h 20m',
-          totalHours: '45h 20m',
-          tags: ['Python', 'Basic Programming', 'OOP'],
-          icon: Code,
-          relatedMilestones: [
-            { title: 'Finish Python Basics', date: 'Apr 25, 2025', progress: 100 },
-            { title: 'Complete OOP Mastery', date: 'May 10, 2025', progress: 100 },
-          ],
-          subSkills: [
-            {
-              id: 'py-basics',
-              name: 'Python Basics',
-              isMain: true,
-              description: 'Syntax, variables, loops, functions, and standard data structures.',
-              status: 'completed',
-              totalHours: '20h',
-              investedHours: '20h',
-              progress: 100,
-              icon: Code,
-            },
-            {
-              id: 'py-oop',
-              name: 'Object Oriented Programming (OOP)',
-              description: 'Classes, inheritance, polymorphism, encapsulation, and dunder methods.',
-              status: 'completed',
-              totalHours: '15h',
-              investedHours: '15h',
-              progress: 100,
-              icon: Code,
-            },
-            {
-              id: 'py-modules',
-              name: 'Modules and Packages',
-              description: 'Code organization, packaging, virtual environments, and PyPI distribution.',
-              status: 'completed',
-              totalHours: '10h',
-              investedHours: '10h',
-              progress: 100,
-              icon: Layout,
-            },
-            {
-              id: 'py-files',
-              name: 'File Handling & I/O',
-              description: 'Reading, writing, context managers, JSON, and CSV processing.',
-              status: 'completed',
-              totalHours: '10h',
-              investedHours: '10h',
-              progress: 100,
-              icon: Layout,
-            },
-            {
-              id: 'py-errors',
-              name: 'Error & Exception Handling',
-              description: 'Try/except blocks, custom exceptions, and defensive programming.',
-              status: 'completed',
-              totalHours: '5h',
-              investedHours: '5h',
-              progress: 100,
-              icon: SettingsIcon,
-            },
-          ],
-        },
-        {
-          id: 'ml-basics',
-          stepNumber: 2,
-          name: 'Machine Learning Basics',
-          description:
-            'Understand ML concepts, data preprocessing, model evaluation and work with scikit-learn.',
-          status: 'in_progress',
-          progress: 60,
-          investedHours: '36h 10m',
-          totalHours: '60h',
-          tags: ['ML Basics', 'Scikit-learn', 'Data Preprocessing'],
-          icon: Brain,
-          relatedMilestones: [
-            { title: 'Finish Regression & Classification Models', date: 'May 25, 2025', progress: 60 },
-            { title: 'Complete Scikit-Learn Pipeline Project', date: 'Jun 15, 2025', progress: 20 },
-          ],
-          subSkills: [
-            {
-              id: 'ml-data-prep',
-              name: 'Data Preprocessing & Cleaning',
-              isMain: true,
-              description: 'Handling missing values, outlier detection, and categorical encoding.',
-              status: 'completed',
-              totalHours: '15h',
-              investedHours: '15h',
-              progress: 100,
-              icon: Layout,
-            },
-            {
-              id: 'ml-feature-eng',
-              name: 'Feature Engineering & Scaling',
-              description: 'StandardScaler, MinMaxScaler, feature extraction, and dimensionality checks.',
-              status: 'in_progress',
-              totalHours: '12h',
-              investedHours: '9h',
-              progress: 75,
-              icon: Zap,
-            },
-            {
-              id: 'ml-supervised',
-              name: 'Supervised Learning (Regression & Classification)',
-              description: 'Linear/Logistic regression, decision trees, random forests, and SVMs.',
-              status: 'in_progress',
-              totalHours: '18h',
-              investedHours: '12h',
-              progress: 66,
-              icon: Brain,
-            },
-            {
-              id: 'ml-unsupervised',
-              name: 'Unsupervised Learning (Clustering & PCA)',
-              description: 'K-Means, DBSCAN, hierarchical clustering, and PCA reduction.',
-              status: 'not_started',
-              totalHours: '8h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Brain,
-            },
-            {
-              id: 'ml-eval',
-              name: 'Model Evaluation & Cross-Validation',
-              description: 'Precision, recall, F1, ROC-AUC, cross_val_score, and GridSearchCV.',
-              status: 'not_started',
-              totalHours: '7h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Target,
-            },
-          ],
-        },
-        {
-          id: 'deep-learning',
-          stepNumber: 3,
-          name: 'Deep Learning',
-          description:
-            'Learn neural networks, TensorFlow/PyTorch, and build real models (CNN, RNN, Transformers).',
-          status: 'not_started',
-          progress: 0,
-          investedHours: '0h',
-          totalHours: '80h',
-          tags: ['PyTorch', 'Neural Networks', 'Deep Learning'],
-          icon: Brain,
-          relatedMilestones: [
-            { title: 'Train First PyTorch Vision Classifier', date: 'Jul 20, 2025', progress: 0 },
-            { title: 'Fine-tune Transformer Model', date: 'Aug 30, 2025', progress: 0 },
-          ],
-          subSkills: [
-            {
-              id: 'dl-ann',
-              name: 'Neural Network Fundamentals & Backprop',
-              isMain: true,
-              description: 'Perceptrons, activation functions, loss gradients, and optimizers.',
-              status: 'not_started',
-              totalHours: '15h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Brain,
-            },
-            {
-              id: 'dl-pytorch',
-              name: 'PyTorch Tensors & Training Loops',
-              description: 'Autograd, custom Dataset/DataLoader, nn.Module, and GPU execution.',
-              status: 'not_started',
-              totalHours: '20h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Code,
-            },
-            {
-              id: 'dl-cnn',
-              name: 'Convolutional Neural Networks (CNNs)',
-              description: 'Convolution kernels, pooling, transfer learning with ResNet/EfficientNet.',
-              status: 'not_started',
-              totalHours: '15h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Brain,
-            },
-            {
-              id: 'dl-transformers',
-              name: 'Transformers & Attention Mechanisms',
-              description: 'Self-attention, multi-head attention, HuggingFace transformers, and LLM fine-tuning.',
-              status: 'not_started',
-              totalHours: '30h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Zap,
-            },
-          ],
-        },
-        {
-          id: 'mlops',
-          stepNumber: 4,
-          name: 'MLOps & Deployment',
-          description:
-            'Learn model deployment, Docker, cloud platforms, monitoring and model versioning.',
-          status: 'not_started',
-          progress: 0,
-          investedHours: '0h',
-          totalHours: '50h',
-          tags: ['Docker', 'AWS/GCP', 'MLOps'],
-          icon: Cloud,
-          relatedMilestones: [
-            { title: 'Deploy Model API with Docker & FastAPI', date: 'Sep 25, 2025', progress: 0 },
-          ],
-          subSkills: [
-            {
-              id: 'mlops-docker',
-              name: 'Docker & Containerization',
-              isMain: true,
-              description: 'Dockerfiles, multi-stage builds, container networking, and compose.',
-              status: 'not_started',
-              totalHours: '15h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Cloud,
-            },
-            {
-              id: 'mlops-fastapi',
-              name: 'FastAPI Model Inference Server',
-              description: 'RESTful prediction endpoints, Pydantic validation, and batch inference.',
-              status: 'not_started',
-              totalHours: '15h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Code,
-            },
-            {
-              id: 'mlops-cicd',
-              name: 'CI/CD & Model Monitoring',
-              description: 'GitHub Actions, MLflow tracking, data drift monitoring, and automated alerts.',
-              status: 'not_started',
-              totalHours: '20h',
-              investedHours: '0h',
-              progress: 0,
-              icon: SettingsIcon,
-            },
-          ],
-        },
-        {
-          id: 'projects',
-          stepNumber: 5,
-          name: 'Build Real Projects',
-          description:
-            'Apply everything by building real-world projects and contributing to open source.',
-          status: 'not_started',
-          progress: 0,
-          investedHours: '0h',
-          totalHours: '70h',
-          tags: ['Projects', 'GitHub', 'Portfolio'],
-          icon: CalendarIcon,
-          relatedMilestones: [
-            { title: 'Launch Production Portfolio with Live Demos', date: 'Nov 30, 2025', progress: 0 },
-          ],
-          subSkills: [
-            {
-              id: 'proj-end-to-end',
-              name: 'End-to-End Prediction Pipeline',
-              isMain: true,
-              description: 'Scrape/gather real dataset, train model, containerize, and deploy live.',
-              status: 'not_started',
-              totalHours: '35h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Target,
-            },
-            {
-              id: 'proj-opensource',
-              name: 'Open Source Contribution',
-              description: 'Submit accepted PRs to popular ML repositories or libraries.',
-              status: 'not_started',
-              totalHours: '15h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Code,
-            },
-            {
-              id: 'proj-portfolio',
-              name: 'Interactive Portfolio & Tech Blog',
-              description: 'Document case studies, architectures, and publish interactive demos.',
-              status: 'not_started',
-              totalHours: '20h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Layout,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'web',
-      title: 'Build a Web Application',
-      description:
-        'Architect and ship a full-stack production application with modern React, FastAPI, and Postgres.',
-      targetDate: 'Nov 15, 2025',
-      totalProgress: 45,
-      timeInvested: '82h 15m',
-      steps: [
-        {
-          id: 'web-front',
-          stepNumber: 1,
-          name: 'Frontend Architecture',
-          description: 'Master React, TypeScript, and modern component architecture.',
-          status: 'completed',
-          progress: 100,
-          investedHours: '40h',
-          totalHours: '40h',
-          tags: ['React', 'TypeScript', 'Vite'],
-          icon: Code,
-          subSkills: [
-            {
-              id: 'wf-react',
-              name: 'React 18 & Component Patterns',
-              isMain: true,
-              description: 'Hooks, context, error boundaries, and component composition.',
-              status: 'completed',
-              totalHours: '15h',
-              investedHours: '15h',
-              progress: 100,
-              icon: Code,
-            },
-            {
-              id: 'wf-ts',
-              name: 'TypeScript for UI Engineers',
-              description: 'Generics, strict typing, interfaces, and API payload definitions.',
-              status: 'completed',
-              totalHours: '15h',
-              investedHours: '15h',
-              progress: 100,
-              icon: Code,
-            },
-            {
-              id: 'wf-state',
-              name: 'State Management (Zustand & React Query)',
-              description: 'Server cache invalidation, optimistic updates, and global store.',
-              status: 'completed',
-              totalHours: '10h',
-              investedHours: '10h',
-              progress: 100,
-              icon: Layout,
-            },
-          ],
-        },
-        {
-          id: 'web-back',
-          stepNumber: 2,
-          name: 'Backend & APIs',
-          description: 'Build fast RESTful APIs with FastAPI and Pydantic.',
-          status: 'in_progress',
-          progress: 50,
-          investedHours: '25h',
-          totalHours: '50h',
-          tags: ['FastAPI', 'Python', 'SQLAlchemy'],
-          icon: Brain,
-          subSkills: [
-            {
-              id: 'wb-fastapi',
-              name: 'FastAPI Core Architecture',
-              isMain: true,
-              description: 'Dependency injection, request validation, and routing.',
-              status: 'completed',
-              totalHours: '15h',
-              investedHours: '15h',
-              progress: 100,
-              icon: Code,
-            },
-            {
-              id: 'wb-db',
-              name: 'PostgreSQL & SQLAlchemy ORM',
-              description: 'Async session management, migrations with Alembic, indexes, and queries.',
-              status: 'in_progress',
-              totalHours: '20h',
-              investedHours: '10h',
-              progress: 50,
-              icon: Layout,
-            },
-            {
-              id: 'wb-auth',
-              name: 'Authentication & JWT Security',
-              description: 'OAuth2 password flow, password hashing with passlib, and protected routes.',
-              status: 'not_started',
-              totalHours: '15h',
-              investedHours: '0h',
-              progress: 0,
-              icon: SettingsIcon,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'health',
-      title: 'Improve Physical Health',
-      description: 'Build sustainable daily habits for cardio, strength progression, and high energy.',
-      targetDate: 'Oct 30, 2025',
-      totalProgress: 20,
-      timeInvested: '35h 0m',
-      steps: [
-        {
-          id: 'cardio',
-          stepNumber: 1,
-          name: 'Cardio Baseline',
-          description: 'Establish Zone 2 aerobic base with daily runs and cycling.',
-          status: 'in_progress',
-          progress: 40,
-          investedHours: '20h',
-          totalHours: '50h',
-          tags: ['Zone 2', 'Running', 'Vitals'],
-          icon: Zap,
-          subSkills: [
-            {
-              id: 'c-zone2',
-              name: 'Zone 2 Aerobic Base Running',
-              isMain: true,
-              description: 'Consistent low-intensity 45m runs maintaining target heart rate 130-145 BPM.',
-              status: 'in_progress',
-              totalHours: '25h',
-              investedHours: '15h',
-              progress: 60,
-              icon: Zap,
-            },
-            {
-              id: 'c-vo2',
-              name: 'VO2 Max Intervals',
-              description: '4x4 minute Norwegian protocol intervals at 90-95% max heart rate.',
-              status: 'not_started',
-              totalHours: '15h',
-              investedHours: '5h',
-              progress: 33,
-              icon: Zap,
-            },
-            {
-              id: 'c-recovery',
-              name: 'Mobility & Joint Health',
-              description: 'Daily 15-minute hip and ankle mobility routines.',
-              status: 'not_started',
-              totalHours: '10h',
-              investedHours: '0h',
-              progress: 0,
-              icon: Heart,
-            },
-          ],
-        },
-      ],
-    },
-  ])
+  const [goals, setGoals] = useState<GoalData[]>([])
 
   const [activeGoalId, setActiveGoalId] = useState('ml')
-  const activeGoal = goals.find((g) => g.id === activeGoalId) || goals[0]
-  const activeSkill = activeGoal.steps.find((s) => s.id === selectedSkillId) || activeGoal.steps[0]
+  const [activeRoadmapId, setActiveRoadmapId] = useState<number | null>(null)
+  const activeGoal = goals.find((g) => g.id === activeGoalId) || goals[0] || null
+  const activeSkill = activeGoal?.steps?.find((s) => s.id === selectedSkillId) || activeGoal?.steps?.[0] || null
+
+
+  // Load real goals from backend
+  useEffect(() => {
+    api
+      .get<any[]>('/goals')
+      .then((bgGoals) => {
+        if (bgGoals && bgGoals.length > 0) {
+          const mapped: GoalData[] = bgGoals.map((bg) => ({
+            id: String(bg.id),
+            title: bg.name,
+            description: bg.description || bg.why || 'Custom goal track with roadmap milestones.',
+            targetDate: bg.target_date
+              ? new Date(bg.target_date).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : 'Dec 31, 2025',
+            totalProgress: bg.progress || 0,
+            timeInvested: '0h',
+            steps: [],
+          }))
+          setGoals(mapped)
+          setActiveGoalId(mapped[0].id)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Load real roadmap tree when activeGoalId changes
+  useEffect(() => {
+    if (!activeGoalId || isNaN(Number(activeGoalId))) return
+    api
+      .get<any>(`/goals/${activeGoalId}/roadmap`)
+      .then((data) => {
+        if (data && data.roadmap) {
+          setActiveRoadmapId(data.roadmap.id)
+          if (data.items && data.items.length > 0) {
+            const mappedSteps: RoadmapStep[] = data.items.map((item: any, idx: number) => ({
+              id: String(item.id),
+              stepNumber: idx + 1,
+              name: item.name,
+              description: item.description || '',
+              status: item.status || 'not_started',
+              progress: item.progress || 0,
+              investedHours: '0h',
+              totalHours: item.estimated_hours ? `${item.estimated_hours}h` : '20h',
+              tags: [item.name.split(' ')[0] || 'Skill', 'Core'],
+              icon: idx % 2 === 0 ? Brain : Code,
+              subSkills: (item.children || []).map((ch: any) => ({
+                id: String(ch.id),
+                name: ch.name,
+                description: ch.description || '',
+                isMain: true,
+                status: ch.status || 'not_started',
+                totalHours: ch.estimated_hours ? `${ch.estimated_hours}h` : '10h',
+                investedHours: '0h',
+                progress: ch.progress || 0,
+                icon: Code,
+              })),
+            }))
+            setGoals((prev) =>
+              prev.map((g) =>
+                g.id === activeGoalId
+                  ? {
+                      ...g,
+                      totalProgress: data.progress || 0,
+                      steps: mappedSteps,
+                    }
+                  : g
+              )
+            )
+            if (mappedSteps.length > 0) {
+              setSelectedSkillId(mappedSteps[0].id)
+            }
+          }
+        }
+      })
+      .catch(() => {})
+  }, [activeGoalId])
 
   const handleOpenSkill = (skillId: string) => {
     setSelectedSkillId(skillId)
     setViewMode('skill-detail')
   }
 
-  const handleStartFocusFromSubSkill = async (subSkillName: string) => {
+  const handleStartFocusFromSubSkill = async (subSkillName: string, subSkillId?: string) => {
+    const sId = subSkillId && !isNaN(Number(subSkillId)) ? Number(subSkillId) : undefined
+    const gId = activeGoal && !isNaN(Number(activeGoal.id)) ? Number(activeGoal.id) : undefined
     try {
-      await startTimer({ note: `${activeSkill.name} - ${subSkillName}` })
+      await startTimer({
+        goal_id: gId,
+        roadmap_item_id: sId,
+        note: `Focusing on ${activeSkill?.name || 'Skill'} - ${subSkillName}`,
+      })
     } catch {
       // ignore
     }
     navigate('/focus')
   }
 
-  const handleSaveGoal = () => {
+  const handleSaveGoal = async () => {
+    if (!isNaN(Number(activeGoal.id))) {
+      try {
+        await api.patch('/goals/' + activeGoal.id, {
+          name: goalTitle,
+          description: goalDesc,
+        })
+      } catch (err) {
+        console.error('Failed to update goal in backend', err)
+      }
+    }
     setGoals((prev) =>
       prev.map((g) =>
         g.id === activeGoal.id
@@ -595,11 +226,25 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
     setIsEditGoalModalOpen(false)
   }
 
-  const handleAddStep = () => {
+  const handleAddStep = async () => {
     if (!newStepName.trim()) return
+    let stepId = `step-${Date.now()}`
+    if (activeRoadmapId) {
+      try {
+        const created = await api.post<any>(`/roadmaps/${activeRoadmapId}/items`, {
+          name: newStepName.trim(),
+          description: newStepDesc.trim() || undefined,
+          estimated_hours: Number(newStepHours) || 20,
+        })
+        if (created && created.id) stepId = String(created.id)
+      } catch (err) {
+        console.error('Failed to create roadmap step in backend', err)
+      }
+    }
+
     const newStep: RoadmapStep = {
-      id: `step-${Date.now()}`,
-      stepNumber: activeGoal.steps.length + 1,
+      id: stepId,
+      stepNumber: (activeGoal.steps?.length || 0) + 1,
       name: newStepName.trim(),
       description: newStepDesc.trim() || 'Core milestones and practical exercises.',
       status: 'not_started',
@@ -608,19 +253,7 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
       totalHours: `${newStepHours}h`,
       tags: [newStepName.split(' ')[0] || 'Skill', 'Core'],
       icon: Brain,
-      subSkills: [
-        {
-          id: `sub-${Date.now()}`,
-          name: `${newStepName.trim()} Fundamentals`,
-          isMain: true,
-          description: 'Fundamental concepts and foundational practice.',
-          status: 'not_started',
-          totalHours: '20h',
-          investedHours: '0h',
-          progress: 0,
-          icon: Code,
-        },
-      ],
+      subSkills: [],
     }
 
     setGoals((prev) =>
@@ -628,13 +261,41 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
     )
     setNewStepName('')
     setNewStepDesc('')
+    setNewStepHours('40')
     setIsAddStepModalOpen(false)
   }
 
-  const handleAddSubSkill = () => {
+  const handleAddSubSkill = async () => {
     if (!newSubSkillName.trim()) return
+    const stepTotalHours = activeSkill ? parseFloat(activeSkill.totalHours) || 20 : 20
+    const currentAllocated = activeSkill ? activeSkill.subSkills.reduce((acc, s) => acc + (parseFloat(s.totalHours) || 0), 0) : 0
+    const remainingHours = Math.max(0, stepTotalHours - currentAllocated)
+    const requestedHours = Number(newSubSkillHours) || 0
+
+    if (requestedHours > remainingHours) {
+      window.alert(`Sub-skills total allocated hours cannot exceed the step's total allocated hours (${stepTotalHours}h). Remaining available: ${remainingHours}h.`)
+      return
+    }
+
+    let subId = `sub-${Date.now()}`
+    if (activeRoadmapId && activeSkill && !isNaN(Number(activeSkill.id))) {
+      try {
+        const created = await api.post<any>(`/roadmaps/${activeRoadmapId}/items`, {
+          name: newSubSkillName.trim(),
+          description: newSubSkillDesc.trim() || undefined,
+          parent_id: Number(activeSkill.id),
+          estimated_hours: requestedHours || 10,
+        })
+        if (created && created.id) subId = String(created.id)
+      } catch (err: any) {
+        console.error('Failed to create sub-skill in backend', err)
+        window.alert(err?.message || 'Failed to create sub-skill in backend')
+        return
+      }
+    }
+
     const newSub: SubSkill = {
-      id: `sub-${Date.now()}`,
+      id: subId,
       name: newSubSkillName.trim(),
       description: newSubSkillDesc.trim() || 'Direct focus unit and practical application.',
       status: 'not_started',
@@ -658,7 +319,16 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
     )
     setNewSubSkillName('')
     setNewSubSkillDesc('')
+    setNewSubSkillHours('10')
     setIsAddSubSkillModalOpen(false)
+  }
+
+  if (!activeGoal) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ color: '#8e95a5', padding: 20 }}>No roadmap available for this goal.</div>
+      </div>
+    )
   }
 
   return (
@@ -1009,7 +679,39 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
                   const Icon = step.icon
 
                   return (
-                    <div key={step.id} className="flow-step-item">
+                    <div
+                      key={step.id}
+                      className="flow-step-item"
+                      draggable
+                      onDragStart={() => setDraggedStepId(step.id)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={async () => {
+                        if (!draggedStepId || draggedStepId === step.id) return
+                        const draggedIdx = activeGoal.steps.findIndex((s) => s.id === draggedStepId)
+                        const targetIdx = idx
+                        if (draggedIdx < 0) return
+
+                        const newSteps = [...activeGoal.steps]
+                        const [removed] = newSteps.splice(draggedIdx, 1)
+                        newSteps.splice(targetIdx, 0, removed)
+
+                        setGoals((prev) =>
+                          prev.map((g) =>
+                            g.id === activeGoal.id ? { ...g, steps: newSteps } : g
+                          )
+                        )
+                        setDraggedStepId(null)
+
+                        if (activeRoadmapId) {
+                          try {
+                            const newOrderedIds = newSteps.map((s) => Number(s.id)).filter((id) => !isNaN(id))
+                            await api.patch(`/roadmaps/${activeRoadmapId}/items/reorder`, { ordered_ids: newOrderedIds })
+                          } catch (err) {
+                            console.error('Failed to reorder steps', err)
+                          }
+                        }
+                      }}
+                    >
                       {/* Timeline Column with Nodes and Downward Arrows */}
                       <div className="flow-step-line-col">
                         <div
@@ -1078,7 +780,26 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
                           {/* Status Badge, Progress Bar & Time */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                             <span
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                const nextStatus = step.status === 'not_started' ? 'in_progress' 
+                                  : step.status === 'in_progress' ? 'completed' : 'not_started'
+                                const nextProgress = nextStatus === 'completed' ? 100 : nextStatus === 'in_progress' ? 50 : 0
+                                try {
+                                  if (!isNaN(Number(step.id))) {
+                                    await api.patch('/roadmap-items/' + step.id, { status: nextStatus, progress: nextProgress })
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to update status', err)
+                                }
+                                setGoals(prev => prev.map(g =>
+                                  g.id === activeGoalId
+                                    ? { ...g, steps: g.steps.map(s => s.id === step.id ? { ...s, status: nextStatus, progress: nextProgress } : s) }
+                                    : g
+                                ))
+                              }}
                               style={{
+                                cursor: 'pointer',
                                 fontSize: 10,
                                 fontWeight: 700,
                                 padding: '2px 8px',
@@ -1266,6 +987,7 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
           VIEW 2: EXPANDED SKILL VIEW (Showing its actual sub-skills!)
           ========================================================= */}
       {viewMode === 'skill-detail' && (
+        activeSkill ? (
         <div className="flow-roadmap-container">
           {/* LEFT MAIN STREAM */}
           <div className="flow-roadmap-main">
@@ -1532,7 +1254,29 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
                           {/* Status Badge & Start Focus Action Button */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                             <span
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                const nextStatus = sub.status === 'not_started' ? 'in_progress' 
+                                  : sub.status === 'in_progress' ? 'completed' : 'not_started'
+                                const nextProgress = nextStatus === 'completed' ? 100 : nextStatus === 'in_progress' ? 50 : 0
+                                try {
+                                  if (!isNaN(Number(sub.id))) {
+                                    await api.patch('/roadmap-items/' + sub.id, { status: nextStatus, progress: nextProgress })
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to update status', err)
+                                }
+                                setGoals(prev => prev.map(g =>
+                                  g.id === activeGoalId
+                                    ? { ...g, steps: g.steps.map(s => s.id === activeSkill.id
+                                        ? { ...s, subSkills: s.subSkills.map(ss => ss.id === sub.id ? { ...ss, status: nextStatus, progress: nextProgress } : ss) }
+                                        : s
+                                      )}
+                                    : g
+                                ))
+                              }}
                               style={{
+                                cursor: 'pointer',
                                 fontSize: 10,
                                 fontWeight: 700,
                                 padding: '2px 8px',
@@ -1558,12 +1302,63 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
                             {/* Direct Start Focus Trigger */}
                             <button
                               type="button"
-                              onClick={() => handleStartFocusFromSubSkill(sub.name)}
+                              onClick={() => handleStartFocusFromSubSkill(sub.name, sub.id)}
                               className="flow-focus-pill-btn"
                               title={`Focus on ${sub.name}`}
                             >
                               <Play size={10} fill="currentColor" />
                               <span>Start Focus</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const newName = window.prompt('Edit sub-skill name:', sub.name)
+                                if (!newName || newName.trim() === sub.name) return
+                                try {
+                                  if (!isNaN(Number(sub.id))) {
+                                    await api.patch('/roadmap-items/' + sub.id, { name: newName.trim() })
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to update sub-skill', err)
+                                }
+                                setGoals(prev => prev.map(g =>
+                                  g.id === activeGoalId
+                                    ? { ...g, steps: g.steps.map(s => s.id === activeSkill.id
+                                        ? { ...s, subSkills: s.subSkills.map(ss => ss.id === sub.id ? { ...ss, name: newName.trim() } : ss) }
+                                        : s
+                                      )}
+                                    : g
+                                ))
+                              }}
+                              style={{ background: 'transparent', border: 'none', color: '#8e95a5', cursor: 'pointer', padding: 2 }}
+                            >
+                              <Edit3 size={13} />
+                            </button>
+                            
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!window.confirm(`Delete sub-skill "${sub.name}"?`)) return
+                                try {
+                                  if (!isNaN(Number(sub.id))) {
+                                    await api.delete('/roadmap-items/' + sub.id)
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to delete sub-skill', err)
+                                }
+                                setGoals(prev => prev.map(g =>
+                                  g.id === activeGoalId
+                                    ? { ...g, steps: g.steps.map(s => s.id === activeSkill.id
+                                        ? { ...s, subSkills: s.subSkills.filter(ss => ss.id !== sub.id) }
+                                        : s
+                                      )}
+                                    : g
+                                ))
+                              }}
+                              style={{ background: 'transparent', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: 2 }}
+                            >
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </div>
@@ -1603,6 +1398,23 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
                 </div>
                 <button
                   type="button"
+                  onClick={async () => {
+                    if (!activeSkill) return
+                    const newName = window.prompt('Edit step name:', activeSkill.name)
+                    if (!newName || newName.trim() === activeSkill.name) return
+                    try {
+                      if (!isNaN(Number(activeSkill.id))) {
+                        await api.patch('/roadmap-items/' + activeSkill.id, { name: newName.trim() })
+                      }
+                    } catch (err) {
+                      console.error('Failed to update step', err)
+                    }
+                    setGoals(prev => prev.map(g =>
+                      g.id === activeGoalId
+                        ? { ...g, steps: g.steps.map(s => s.id === activeSkill.id ? { ...s, name: newName.trim() } : s) }
+                        : g
+                    ))
+                  }}
                   style={{ background: 'transparent', border: 'none', color: '#8e95a5', cursor: 'pointer', padding: 2 }}
                 >
                   <Edit3 size={13} />
@@ -1726,8 +1538,21 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
 
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete this skill?')) {
+                onClick={async () => {
+                  if (!activeSkill) return
+                  if (window.confirm('Are you sure you want to delete this skill and all its sub-skills?')) {
+                    try {
+                      if (!isNaN(Number(activeSkill.id))) {
+                        await api.delete('/roadmap-items/' + activeSkill.id)
+                      }
+                    } catch (err) {
+                      console.error('Failed to delete step', err)
+                    }
+                    setGoals(prev => prev.map(g =>
+                      g.id === activeGoalId
+                        ? { ...g, steps: g.steps.filter(s => s.id !== activeSkill.id) }
+                        : g
+                    ))
                     setViewMode('roadmap')
                   }
                 }}
@@ -1753,6 +1578,9 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
             </div>
           </aside>
         </div>
+        ) : (
+          <div style={{ color: '#8e95a5', padding: 20 }}>Select a skill to view details.</div>
+        )
       )}
 
       {/* =========================================================
@@ -1926,9 +1754,17 @@ export function RoadmapView({ departmentId: _departmentId }: { departmentId?: nu
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#8e95a5', marginBottom: 4 }}>Target Hours</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label style={{ fontSize: 11, color: '#8e95a5' }}>Target Hours</label>
+                  {activeSkill && (
+                    <span style={{ fontSize: 10.5, color: '#00e599', fontWeight: 600 }}>
+                      Available: {Math.max(0, (parseFloat(activeSkill.totalHours) || 20) - activeSkill.subSkills.reduce((acc, s) => acc + (parseFloat(s.totalHours) || 0), 0))}h remaining (out of {activeSkill.totalHours})
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
+                  min={1}
                   value={newSubSkillHours}
                   onChange={(e) => setNewSubSkillHours(e.target.value)}
                   style={{ width: '100%' }}
