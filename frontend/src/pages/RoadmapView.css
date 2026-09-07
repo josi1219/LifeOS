@@ -1,0 +1,294 @@
+/* Roadmap & Nested Skills System Styles */
+
+.flow-roadmap-container {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 325px;
+  gap: 14px;
+  align-items: start;
+}
+
+.flow-roadmap-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.flow-roadmap-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Hero Banner (Current Goal / Skill Overview) */
+.flow-roadmap-hero {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #070a10 0%, #0d121c 45%, #14111f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  min-height: 124px;
+}
+
+.flow-roadmap-hero-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 75% 70%, rgba(56, 189, 248, 0.12) 0%, rgba(139, 92, 246, 0.15) 30%, transparent 65%);
+}
+
+.flow-roadmap-hero-silhouette {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.flow-roadmap-hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 540px;
+}
+
+/* Connected Vertical Stepper Timeline */
+.flow-stepper-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.flow-step-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+/* Timeline Vertical Line & Directional Arrows */
+.flow-step-line-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.flow-step-node {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  z-index: 2;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.flow-step-node.completed {
+  background: #00e599;
+  color: #080b11;
+  box-shadow: 0 0 12px rgba(0, 229, 153, 0.35);
+}
+
+.flow-step-node.in-progress {
+  background: #141724;
+  border: 1.5px solid #8b5cf6;
+  color: #8b5cf6;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+}
+
+.flow-step-node.not-started {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #8e95a5;
+}
+
+.flow-step-connector {
+  position: absolute;
+  top: 30px;
+  bottom: -12px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.flow-step-connector.completed {
+  background: #00e599;
+}
+
+.flow-step-connector-arrow {
+  background: var(--color-bg);
+  color: #4e5564;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 0;
+  z-index: 2;
+}
+
+.flow-step-connector.completed .flow-step-connector-arrow {
+  color: #00e599;
+}
+
+/* Step Card Container */
+.flow-step-card {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+
+.flow-step-card:hover {
+  border-color: var(--color-border-hover);
+  background: rgba(255, 255, 255, 0.02);
+  transform: translateY(-1px);
+}
+
+.flow-step-card.active {
+  border-color: rgba(0, 229, 153, 0.35);
+  box-shadow: 0 0 18px rgba(0, 229, 153, 0.1);
+}
+
+/* Pill Tags */
+.flow-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  color: #8e95a5;
+  font-weight: 500;
+}
+
+/* Sub-Skills Cards (Direct Focus Unit - No confusing 3rd nested level) */
+.flow-subskill-card {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.18s ease;
+}
+
+.flow-subskill-card:hover {
+  border-color: var(--color-border-hover);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* Focus Action Pill Button */
+.flow-focus-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #00e599 0%, #00c27d 100%);
+  color: #080b11;
+  font-weight: 800;
+  font-size: 11px;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 5px 12px;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0, 229, 153, 0.3);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.flow-focus-pill-btn:hover {
+  background: #00f5a0;
+  box-shadow: 0 0 18px rgba(0, 229, 153, 0.45);
+  transform: scale(1.02);
+}
+
+/* Interactive Modal Overlays */
+.flow-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.flow-modal-card {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border-hover);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+  width: 100%;
+  max-width: 480px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Responsive Media Queries */
+@media (max-width: 1200px) {
+  .flow-roadmap-container {
+    grid-template-columns: minmax(0, 1fr) 290px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 991px) {
+  .flow-roadmap-container {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .flow-roadmap-sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+}
+
+@media (max-width: 767px) {
+  .flow-roadmap-container {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .flow-roadmap-sidebar {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .flow-roadmap-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 14px;
+  }
+}

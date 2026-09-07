@@ -8,7 +8,6 @@ import {
   History,
   Map,
   Plus,
-  Sparkles,
   Target,
   Zap,
 } from 'lucide-react'
@@ -120,7 +119,7 @@ export function DepartmentDetail() {
                 #{department.priority} {department.name}
               </h1>
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                Current Phase: <strong style={{ color: 'var(--color-accent-text)' }}>{department.current_phase ?? 'Active Execution'}</strong>
+                Current Phase: <strong style={{ color: 'var(--color-accent-text)' }}>{department.current_phase ?? 'Not set'}</strong>
               </div>
             </div>
           </div>

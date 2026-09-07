@@ -1,0 +1,255 @@
+﻿/* Zen Focus Mode Styles */
+
+.flow-focus-screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #04060a;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 30px 42px;
+  user-select: none;
+  overflow: hidden;
+  z-index: 9999;
+  box-sizing: border-box;
+}
+
+/* Photographic Mountain Moonscape Backdrop */
+.flow-focus-mountains {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48%;
+  background-image: url('/images/OIP 4 - focus mode.jpg');
+  background-position: center bottom;
+  background-size: cover;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.85;
+}
+
+.flow-focus-mountains-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 55%;
+  background: linear-gradient(
+    to bottom,
+    #04060a 0%,
+    rgba(4, 6, 10, 0.82) 30%,
+    rgba(4, 6, 10, 0.3) 65%,
+    rgba(4, 6, 10, 0.5) 100%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Top Minimal Header */
+.flow-focus-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  z-index: 10;
+}
+
+.flow-focus-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.flow-focus-brand:hover {
+  opacity: 0.85;
+}
+
+.flow-focus-brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.flow-focus-brand-motto {
+  font-size: 12px;
+  font-style: italic;
+  color: #5a6478;
+  font-weight: 400;
+}
+
+.flow-focus-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: 12px;
+}
+
+.flow-focus-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.flow-focus-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #00e599;
+  box-shadow: 0 0 8px rgba(0, 229, 153, 0.8);
+  animation: flow-pulse 2.5s infinite ease-in-out;
+}
+
+.flow-focus-dot.paused {
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+  animation: none;
+}
+
+@keyframes flow-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+.flow-focus-clock {
+  color: #5a6478;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Center Content & Timer */
+.flow-focus-center {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.flow-focus-subtitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: #5a6478;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.flow-focus-title {
+  margin: 0 0 8px 0;
+  font-size: 34px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.flow-focus-subskill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 34px;
+}
+
+.flow-focus-subskill-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.75px solid #818cf8;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+/* Interactive Dial */
+.flow-focus-dial-container {
+  position: relative;
+  width: 360px;
+  height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.flow-focus-dial-container:hover {
+  transform: scale(1.015);
+}
+
+.flow-focus-dial-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.flow-focus-time-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.flow-focus-digits {
+  font-size: 48px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  margin-bottom: 8px;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+}
+
+.flow-focus-remaining-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: #5a6478;
+  text-transform: uppercase;
+}
+
+/* Quote and Divider below */
+.flow-focus-quote-section {
+  margin-top: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.flow-focus-quote {
+  font-size: 13px;
+  font-style: italic;
+  color: #5a6478;
+}
+
+.flow-focus-divider {
+  width: 32px;
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+}

@@ -1,0 +1,148 @@
+/* Calendar Page Styles & Grid */
+
+.flow-calendar-container {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 14px;
+  align-items: start;
+}
+
+.flow-calendar-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.flow-calendar-sidebar {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Calendar Month Grid Card */
+.flow-calendar-grid-card {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Day of week headers */
+.flow-calendar-header-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4e5564;
+  padding-bottom: 4px;
+}
+
+/* Main month days grid */
+.flow-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.flow-cal-cell {
+  background: #0c1018;
+  min-height: 72px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.flow-cal-cell:hover {
+  background: #111724;
+}
+
+.flow-cal-cell.other-month {
+  background: #090c13;
+  opacity: 0.45;
+}
+
+.flow-cal-cell.selected {
+  border: 1.5px solid #00e599;
+  z-index: 2;
+  border-radius: 4px;
+  background: rgba(0, 229, 153, 0.03);
+}
+
+.flow-cal-cell-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8e95a5;
+}
+
+.flow-cal-cell.selected .flow-cal-cell-header {
+  background: #00e599;
+  color: #04060a;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* Event chip pill inside day cell */
+.flow-cal-event-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 3px 5px;
+  font-size: 9px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+/* Schedule item in sidebar */
+.flow-schedule-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 11.5px;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1100px) {
+  .flow-calendar-container {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 950px) {
+  .flow-calendar-container {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}

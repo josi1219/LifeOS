@@ -14,20 +14,22 @@ their plan from memory. This must never collapse into a generic task manager or 
 
 ---
 
-## 2. Status: Phase 1 & Phase 2 are DONE and verified. Phase 3 is NOT started.
+## 2. Status: Phase 1, Phase 2, and Phase 3 are DONE and verified. Phase 4 is NOT started.
 
 The project is split into 8 phases.
 - **Phase 1 (Core Foundation)**: DONE and verified.
 - **Phase 2 (Roadmaps/Skills/Milestones/Projects/Tasks/Resources/Experiments)**: DONE and verified.
-- **Phase 3 (Timer/TimeSession)**: NOT started (see forward-reference schema in Section 7).
+- **Phase 3 (Timer/TimeSession, Live HUD, Aggregations, Context Capture)**: DONE and verified.
+- **Phase 4 (Daily Tracking / Logs / Habits / Reviews)**: NOT started.
 
 ### Verified working:
 - `docker compose up --build` starts db + backend + frontend cleanly.
-- Backend: **60/60** pytest tests passing, including an exhaustive cross-user authorization matrix (404 on all unauthorized access).
-- Alembic migrations apply and reverse cleanly (`alembic upgrade head` / `downgrade base`).
+- Backend: **69/69** pytest tests passing, including cross-user authorization tests on time sessions and entity start validation.
+- Alembic migrations apply and reverse cleanly (`8d6720d5a933_phase3_time_sessions`).
 - Frontend TypeScript build passes without warnings or errors (`tsc -b && vite build`).
+- Global Timer state, topbar `LiveTimerHUD`, `StopSessionModal`, `ManualSessionModal`, and dashboard `InlineTimerWidget` are fully connected to real backend endpoints.
 - End-to-end smoke test passed through the Vite dev proxy: register → create department → create goal →
-  dashboard correctly resolves current focus.
+  dashboard correctly resolves current focus and timer tracks deep work sessions.
 - Host ports are remapped in `docker-compose.yml` to **5434** (Postgres) and **8010** (backend API) to avoid
   clashing with other local Docker projects on this machine. Frontend stays on 5173. Container-internal ports
   are still the standard 5432/8000, so this only affects host-side URLs.
@@ -221,12 +223,31 @@ Phase 3 (Timer/TimeSession) stays deferred — do not build it as part of Phase 
 
 ---
 
-## 7. Phase 3 target schema (forward-reference only — not built)
+## 7. Phase 3 (Timer & TimeSession) — BUILT AND VERIFIED
 
-`TimeSession(id, user_id, department_id nullable, goal_id nullable, roadmap_item_id nullable, skill_id
-nullable, project_id nullable, task_id nullable, start_time, end_time nullable, duration_seconds,
-pause_duration_seconds, status, note, created_at)`. All totals (e.g. "Coding: 312h") must be derived via
-SUM/GROUP BY over `TimeSession` at query time — never stored as duplicated aggregate columns.
+- **Model**: `TimeSession(id, user_id, department_id, goal_id, roadmap_item_id, skill_id, project_id, task_id, start_time, end_time, last_paused_at, duration_seconds, pause_duration_seconds, status, note, created_at)`
+- **Migration**: `8d6720d5a933_phase3_time_sessions.py` (applied and verified reversible).
+- **Enforced Rules**:
+  1. Single active session per user constraint (starting a new timer auto-completes any existing active session).
+  2. Auto-fill from `CurrentFocus` when entity parameters are omitted.
+  3. Dynamic SQL derivations only: all aggregations (`today_seconds`, `week_seconds`, `by_department`) are computed via `SUM()` and `GROUP BY` at query time. No static aggregate columns stored.
+  4. Context preservation: on session stop, user is prompted for an accomplishment note with the option to update `CurrentFocus.note`.
+  5. Strict ownership: cross-user authorization tests return 404.
+- **Frontend Components**:
+  - `TimerContext.tsx`: Global state, live ticking interval, lifecycle actions.
+  - `LiveTimerHUD.tsx`: Sleek topbar indicator with pause, resume, finish, and discard controls.
+  - `StopSessionModal.tsx`: Session accomplishment logger & focus note sync.
+  - `ManualSessionModal.tsx`: Retroactive time logger for offline work.
+  - `Dashboard.tsx`: Connected `InlineTimerWidget`, hero session launcher, and time allocation breakdown.
+  - Shortcut tracking buttons on Roadmap items and Project tasks.
+
+---
+
+## 8. Phase 4 Target — Daily Tracking / Logs / Habits / Reviews (What to build next)
+
+- Daily Log / Check-in entries (morning planning, evening reflection, daily energy / focus ratings).
+- Habit tracker & recurrence loops connected to departments and identity goals.
+- Weekly review mechanism synthesizing completed tasks, roadmap progress, experiments, and time session summaries.
 
 ---
 

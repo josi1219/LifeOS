@@ -15,12 +15,13 @@ from app.api.routes import (
     roadmaps,
     skills,
     tasks,
+    time_sessions,
 )
 from app.core.config import get_settings
 
 settings = get_settings()
 
-app = FastAPI(title="LifeOS API", version="0.2.0")
+app = FastAPI(title="LifeOS API", version="0.3.0")
 
 # Only relevant for direct cross-origin API access (e.g. tools hitting the API without the dev proxy).
 app.add_middleware(
@@ -44,6 +45,7 @@ app.include_router(projects.router)
 app.include_router(tasks.router)
 app.include_router(resources.router)
 app.include_router(experiments.router)
+app.include_router(time_sessions.router)
 
 
 @app.get("/health")

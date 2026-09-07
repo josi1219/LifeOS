@@ -1,257 +1,366 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
+  Bell,
   BookOpen,
-  CheckSquare,
-  Compass,
-  Crosshair,
-  FlaskConical,
-  FolderKanban,
-  LayoutDashboard,
+  Calendar,
+  Edit3,
+  Eye,
+  Flag,
+  GitBranch,
+  Home,
   LogOut,
-  Map,
-  Milestone as MilestoneIcon,
-  Sparkles,
-  Zap,
+  Menu,
+  Mountain,
+  Search,
+  Settings,
+  Target,
+  X,
+  type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import { useTimer } from '../features/timer/TimerContext'
+import { LiveTimerHUD } from '../features/timer/LiveTimerHUD'
+import { StopSessionModal } from '../features/timer/StopSessionModal'
+import './AppShell.css'
 
-interface NavGroup {
-  pillar: string
-  items: { to: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }[]
+interface NavItem {
+  to: string
+  label: string
+  icon: LucideIcon
 }
 
-const NAV_GROUPS: NavGroup[] = [
-  {
-    pillar: 'FOCUS',
-    items: [
-      { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-      { to: '/departments', label: 'Departments', icon: Compass },
-    ],
-  },
-  {
-    pillar: 'PLAN',
-    items: [
-      { to: '/experiments', label: 'Experiments', icon: FlaskConical },
-      { to: '/resources', label: 'Knowledge Base', icon: BookOpen },
-    ],
-  },
+const NAV_ITEMS: NavItem[] = [
+  { to: '/', label: 'Home', icon: Home },
+  { to: '/roadmap', label: 'Roadmap', icon: GitBranch },
+  { to: '/goals', label: 'Goals', icon: Target },
+  { to: '/milestones', label: 'Milestones', icon: Flag },
+  { to: '/calendar', label: 'Calendar', icon: Calendar },
+  { to: '/focus', label: 'Focus', icon: Eye },
+  { to: '/journal', label: 'Journal', icon: BookOpen },
+  { to: '/reflections', label: 'Reflections', icon: Edit3 },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth()
+  const { status } = useTimer()
   const location = useLocation()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
 
-  // Derive simple breadcrumb or title
-  const getPageTitle = () => {
-    if (location.pathname === '/') return 'Mission Control'
-    if (location.pathname.startsWith('/departments/')) return 'Department Workspace'
-    if (location.pathname === '/departments') return 'Departments'
-    if (location.pathname === '/experiments') return 'Research & Experiments'
-    if (location.pathname === '/resources') return 'Knowledge & Resources'
-    return 'LifeOS'
+  // Full-screen distraction-free mode for /focus
+  const isFocusMode = location.pathname === '/focus'
+
+  if (isFocusMode) {
+    return (
+      <div style={{ height: '100vh', background: '#05070a', color: '#f0f2f7', overflow: 'hidden' }}>
+        <StopSessionModal />
+        {children}
+      </div>
+    )
   }
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning,'
+    if (hour < 18) return 'Good afternoon,'
+    return 'Good evening,'
+  }
+
+  const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : 'K'
+
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      {/* Sleek Dark Sidebar */}
-      <aside
-        style={{
-          width: 250,
-          background: 'var(--color-bg-alt)',
-          borderRight: '1px solid var(--color-border)',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          padding: 'var(--space-4) var(--space-3)',
-          zIndex: 10,
-        }}
-      >
+    <div className="flow-shell-root">
+      {/* Mobile Backdrop Overlay */}
+      <div
+        className={`flow-mobile-backdrop ${isMobileMenuOpen ? 'open' : ''}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+      />
+
+      {/* Sleek Minimalist Obsidian Sidebar */}
+      <aside className={`flow-sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {/* Brand Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 var(--space-2)' }}>
-            <div
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 'var(--radius-sm)',
-                background: 'linear-gradient(135deg, var(--color-accent) 0%, #38bdf8 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 0 16px var(--color-accent-glow)',
-              }}
+          {/* Flow Brand Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--color-accent)"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14" />
+                </svg>
+              </div>
+              <span style={{ fontWeight: 800, fontSize: 19, letterSpacing: '-0.02em', color: '#ffffff' }}>
+                Flow
+              </span>
+            </div>
+
+            {/* Close button on mobile drawer */}
+            <button
+              type="button"
+              className="flow-mobile-menu-btn"
+              onClick={() => setIsMobileMenuOpen(false)}
+              aria-label="Close menu"
             >
-              <Sparkles size={18} color="#ffffff" />
-            </div>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                LifeOS
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-faint)', fontWeight: 500 }}>
-                Organized. On purpose.
-              </div>
-            </div>
+              <X size={18} />
+            </button>
           </div>
 
-          {/* Navigation Pillars */}
-          <nav style={{ display: 'grid', gap: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
-            {NAV_GROUPS.map((group) => (
-              <div key={group.pillar}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: '0.08em',
-                    color: 'var(--color-text-faint)',
-                    padding: '0 var(--space-2)',
-                    marginBottom: 'var(--space-1)',
-                  }}
-                >
-                  {group.pillar}
-                </div>
-                <div style={{ display: 'grid', gap: 2 }}>
-                  {group.items.map((item) => {
-                    const Icon = item.icon
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        end={item.to === '/'}
-                        style={({ isActive }) => ({
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          padding: '8px var(--space-2)',
-                          borderRadius: 'var(--radius-sm)',
-                          textDecoration: 'none',
-                          fontSize: 13,
-                          fontWeight: isActive ? 600 : 500,
-                          color: isActive ? '#ffffff' : 'var(--color-text-muted)',
-                          background: isActive
-                            ? 'linear-gradient(90deg, var(--color-accent-subtle) 0%, transparent 100%)'
-                            : 'transparent',
-                          borderLeft: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
-                          transition: 'all 0.15s ease',
-                        })}
-                      >
-                        <Icon size={16} />
-                        <span>{item.label}</span>
-                      </NavLink>
-                    )
+          {/* Clean Navigation List */}
+          <nav style={{ display: 'grid', gap: 4, marginTop: 'var(--space-2)' }}>
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon
+              const isHome = item.to === '/'
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={isHome}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  style={({ isActive }) => ({
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    textDecoration: 'none',
+                    fontSize: 13,
+                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? '#ffffff' : 'var(--color-text-muted)',
+                    background: isActive ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+                    borderLeft: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
+                    transition: 'all 0.15s ease',
                   })}
-                </div>
-              </div>
-            ))}
+                >
+                  <Icon size={16} />
+                  <span>{item.label}</span>
+                </NavLink>
+              )
+            })}
           </nav>
         </div>
 
-        {/* User Profile & Logout Bottom Section */}
-        <div
-          style={{
-            borderTop: '1px solid var(--color-border)',
-            paddingTop: 'var(--space-3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+        {/* Sidebar Footer */}
+        <div style={{ padding: '0 var(--space-2)', display: 'grid', gap: 14 }}>
+          <div>
             <div
               style={{
-                width: 30,
-                height: 30,
-                borderRadius: 'var(--radius-full)',
-                background: 'var(--color-surface-elevated)',
-                border: '1px solid var(--color-border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 12,
-                fontWeight: 700,
-                color: 'var(--color-accent-text)',
-                flexShrink: 0,
+                fontStyle: 'italic',
+                fontSize: 11,
+                color: 'var(--color-text-muted)',
+                lineHeight: 1.4,
               }}
             >
-              {user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
+              "Discipline today, freedom tomorrow."
             </div>
-            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
-              <div style={{ color: 'var(--color-text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.email?.split('@')[0]}
-              </div>
-              <div style={{ color: 'var(--color-text-faint)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.email}
-              </div>
+            <div style={{ marginTop: 8, color: 'var(--color-text-faint)', display: 'flex', alignItems: 'center' }}>
+              <Mountain size={16} />
+            </div>
+            <div
+              style={{
+                marginTop: 10,
+                fontSize: 10,
+                letterSpacing: '0.04em',
+                color: 'var(--color-text-faint)',
+              }}
+            >
+              Focus / Learn / Grow / Repeat
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => logout()}
-            title="Log out"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: 6,
-              color: 'var(--color-text-faint)',
-              borderRadius: 'var(--radius-xs)',
-              cursor: 'pointer',
-            }}
-          >
-            <LogOut size={16} />
-          </button>
         </div>
       </aside>
 
-      {/* Main Content Area with Frosted Top Header */}
+      {/* Main Content Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <header
-          style={{
-            height: 56,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '0 var(--space-5)',
-            borderBottom: '1px solid var(--color-border)',
-            background: 'rgba(9, 10, 16, 0.75)',
-            backdropFilter: 'blur(12px)',
-            zIndex: 5,
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>
-              {getPageTitle()}
-            </span>
+        {/* Top Header Bar */}
+        <header className="flow-header">
+          {/* Greeting Header & Mobile Toggle */}
+          <div className="flow-header-left">
+            <button
+              type="button"
+              className="flow-mobile-menu-btn"
+              onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={20} />
+            </button>
+            <div>
+              <div className="flow-header-title">
+                {getGreeting()}
+              </div>
+              <div className="flow-header-subtitle">
+                Small steps every day lead to big results.
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <div
+          {/* Right Action Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {/* Live timer HUD only renders when active session is running */}
+            {status !== 'idle' && <LiveTimerHUD />}
+
+            <button
+              type="button"
+              title="Search"
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-full)',
-                background: 'var(--color-surface-raised)',
-                border: '1px solid var(--color-border)',
-                fontSize: 12,
+                background: 'transparent',
+                border: 'none',
                 color: 'var(--color-text-muted)',
+                padding: 6,
+                cursor: 'pointer',
+                borderRadius: 'var(--radius-xs)',
               }}
             >
-              <Crosshair size={13} color="var(--color-accent-text)" />
-              <span>LifeOS 2.0 Active</span>
+              <Search size={18} />
+            </button>
+
+            <button
+              type="button"
+              title="Notifications"
+              style={{
+                position: 'relative',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--color-text-muted)',
+                padding: 6,
+                cursor: 'pointer',
+                borderRadius: 'var(--radius-xs)',
+              }}
+            >
+              <Bell size={18} />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 6,
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: 'var(--color-accent)',
+                }}
+              />
+            </button>
+
+            {/* Profile Avatar Badge with Menu Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                title={user?.email || 'Account'}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 'var(--radius-full)',
+                  background: 'var(--color-surface-elevated)',
+                  border: '1px solid var(--color-border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: 'var(--color-accent)',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                {userInitial}
+              </button>
+
+              {isProfileMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: 8,
+                    background: 'var(--color-surface-elevated)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+                    padding: '6px 0',
+                    minWidth: 170,
+                    zIndex: 100,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: 11,
+                      color: 'var(--color-text-muted)',
+                      borderBottom: '1px solid var(--color-border)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {user?.email || 'User'}
+                  </div>
+                  <NavLink
+                    to="/settings"
+                    onClick={() => setIsProfileMenuOpen(false)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 14px',
+                      fontSize: 12,
+                      color: 'var(--color-text)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <Settings size={14} />
+                    <span>Settings</span>
+                  </NavLink>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false)
+                      logout()
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 14px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#f43f5e',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <LogOut size={14} />
+                    <span>Log out</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
 
+        {/* Global Stop Session Modal */}
+        <StopSessionModal />
+
         {/* Scrollable Page Body */}
-        <main
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: 'var(--space-5)',
-          }}
-        >
+        <main className="flow-main-content">
           {children}
         </main>
       </div>

@@ -14,6 +14,7 @@ from app.models.roadmap import Roadmap
 from app.models.roadmap_item import RoadmapItem, roadmap_item_prerequisites
 from app.models.skill import Skill, skill_roadmap_items
 from app.models.task import Task
+from app.models.time_session import TimeSession
 from app.models.user import User
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "RoadmapItem",
     "Skill",
     "Task",
+    "TimeSession",
     "User",
     "milestone_projects",
     "milestone_skills",

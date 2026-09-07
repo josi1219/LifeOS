@@ -3,15 +3,17 @@ import {
   CheckCircle2,
   Circle,
   ExternalLink,
-  FolderKanban,
   Github,
+  Play,
   Plus,
   Trash2,
 } from 'lucide-react'
 import { api } from '../api/client'
 import type { Project, Task } from '../api/types'
+import { useTimer } from '../features/timer/TimerContext'
 
 function ProjectTasks({ projectId }: { projectId: number }) {
+  const { startTimer, activeSession } = useTimer()
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTaskName, setNewTaskName] = useState('')
 
@@ -93,13 +95,35 @@ function ProjectTasks({ projectId }: { projectId: number }) {
                 )}
                 <span>{t.name}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteTask(t.id)}
-                style={{ border: 'none', background: 'none', padding: '0 4px', cursor: 'pointer', color: 'var(--color-text-faint)' }}
-              >
-                <Trash2 size={13} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => startTimer({ project_id: projectId, task_id: t.id })}
+                  title="Track time on this task"
+                  style={{
+                    border: 'none',
+                    background: activeSession?.task_id === t.id ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                    color: activeSession?.task_id === t.id ? '#10b981' : 'var(--color-text-faint)',
+                    padding: '2px 6px',
+                    borderRadius: 'var(--radius-xs)',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    fontSize: 11,
+                  }}
+                >
+                  <Play size={10} fill="currentColor" />
+                  <span>{activeSession?.task_id === t.id ? 'Focusing' : 'Track'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteTask(t.id)}
+                  style={{ border: 'none', background: 'none', padding: '0 4px', cursor: 'pointer', color: 'var(--color-text-faint)' }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
           )
         })}

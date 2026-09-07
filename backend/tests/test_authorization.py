@@ -2,6 +2,7 @@
 so unauthorized requests can't even infer that the resource exists.
 """
 
+from datetime import datetime, timedelta, timezone
 from httpx import AsyncClient
 
 from conftest import auth_headers, register_user
@@ -24,10 +25,12 @@ async def _make_user_with_full_setup(client: AsyncClient) -> dict:
     task = (await client.post(f"/api/projects/{project['id']}/tasks", json={"name": "Task"}, headers=headers)).json()
     resource = (await client.post("/api/resources", json={"type": "url", "title": "Res"}, headers=headers)).json()
     experiment = (await client.post("/api/experiments", json={"name": "Exp"}, headers=headers)).json()
+    time_session = (await client.post("/api/time-sessions/start", json={"department_id": department["id"]}, headers=headers)).json()
     return {
         "user": user, "headers": headers, "department": department, "goal": goal,
         "roadmap": roadmap, "item": item, "skill": skill, "milestone": milestone,
         "project": project, "task": task, "resource": resource, "experiment": experiment,
+        "time_session": time_session,
     }
 
 
@@ -138,3 +141,42 @@ async def test_user_cannot_access_another_users_experiment(client: AsyncClient):
     assert (await client.patch(f"/api/experiments/{owner['experiment']['id']}", json={"name": "X"}, headers=other_headers)).status_code == 404
     assert (await client.delete(f"/api/experiments/{owner['experiment']['id']}", headers=other_headers)).status_code == 404
     assert (await client.post(f"/api/experiments/{owner['experiment']['id']}/status", json={"status": "reject"}, headers=other_headers)).status_code == 404
+
+
+async def test_user_cannot_control_another_users_time_session(client: AsyncClient):
+    owner = await _make_user_with_full_setup(client)
+    other = await register_user(client)
+    other_headers = auth_headers(other["access_token"])
+    session_id = owner["time_session"]["id"]
+
+    assert (await client.post(f"/api/time-sessions/{session_id}/pause", headers=other_headers)).status_code == 404
+    assert (await client.post(f"/api/time-sessions/{session_id}/resume", headers=other_headers)).status_code == 404
+    assert (await client.post(f"/api/time-sessions/{session_id}/stop", json={"note": "hack"}, headers=other_headers)).status_code == 404
+    assert (await client.post(f"/api/time-sessions/{session_id}/discard", headers=other_headers)).status_code == 404
+
+
+async def test_user_cannot_start_session_on_another_users_department(client: AsyncClient):
+    owner = await _make_user_with_full_setup(client)
+    other = await register_user(client)
+    other_headers = auth_headers(other["access_token"])
+
+    # Attempt to start a session referencing owner's department
+    res = await client.post(
+        "/api/time-sessions/start",
+        json={"department_id": owner["department"]["id"]},
+        headers=other_headers,
+    )
+    assert res.status_code == 404
+
+    # Attempt manual session with owner's department
+    now = datetime.now(timezone.utc)
+    res_manual = await client.post(
+        "/api/time-sessions/manual",
+        json={
+            "department_id": owner["department"]["id"],
+            "start_time": (now - timedelta(minutes=10)).isoformat(),
+            "end_time": now.isoformat(),
+        },
+        headers=other_headers,
+    )
+    assert res_manual.status_code == 404

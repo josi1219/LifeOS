@@ -1,0 +1,218 @@
+/* Flow Dashboard Styles & Responsive Grid */
+
+.flow-dashboard-container {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 325px;
+  gap: 12px;
+  align-items: start;
+}
+
+.flow-dashboard-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.flow-dashboard-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Identical 50% / 50% split for both rows so all boxes align perfectly */
+.flow-dashboard-mid-row,
+.flow-dashboard-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Milestone Hero Banner */
+.flow-milestone-banner {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #070a10;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  min-height: 124px;
+}
+
+.flow-milestone-photo-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('/images/OIP 2.webp');
+  background-size: cover;
+  background-position: right 30%;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.flow-milestone-gradient-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    #070a10 0%,
+    rgba(7, 10, 16, 0.96) 38%,
+    rgba(7, 10, 16, 0.7) 60%,
+    rgba(7, 10, 16, 0.22) 80%,
+    rgba(7, 10, 16, 0.45) 100%
+  );
+  pointer-events: none;
+}
+
+.flow-milestone-content {
+  position: relative;
+  z-index: 2;
+  max-width: 440px;
+}
+
+.flow-milestone-quote {
+  position: relative;
+  z-index: 2;
+  max-width: 250px;
+  text-align: right;
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(240, 242, 247, 0.75);
+}
+
+/* Today's Focus Body */
+.flow-focus-body {
+  display: grid;
+  grid-template-columns: 125px 1fr;
+  gap: 16px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.flow-dial-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Quote at bottom of right sidebar */
+.flow-sidebar-quote {
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--color-text-faint);
+  font-style: italic;
+  padding-right: 4px;
+  margin-top: 2px;
+}
+
+/* Generic dashboard card override for compact viewport fit */
+.flow-card {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease;
+}
+
+.flow-card:hover {
+  border-color: var(--color-border-hover);
+}
+
+/* =========================================================
+   RESPONSIVE BREAKPOINTS
+   ========================================================= */
+
+/* Laptop / Medium Desktop (992px - 1200px) */
+@media (max-width: 1200px) {
+  .flow-dashboard-container {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 10px;
+  }
+  
+  .flow-dashboard-mid-row,
+  .flow-dashboard-bottom-row {
+    gap: 10px;
+  }
+
+  .flow-milestone-banner {
+    padding: 16px 20px;
+  }
+}
+
+/* Tablet (768px - 991px) */
+@media (max-width: 991px) {
+  .flow-dashboard-container {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  
+  .flow-dashboard-sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .flow-sidebar-quote {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+}
+
+/* Mobile & Small Tablet (< 768px) */
+@media (max-width: 767px) {
+  .flow-dashboard-container {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .flow-dashboard-sidebar {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .flow-dashboard-mid-row,
+  .flow-dashboard-bottom-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .flow-milestone-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 14px;
+  }
+
+  .flow-milestone-quote {
+    text-align: left;
+    max-width: 100%;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding-top: 10px;
+    width: 100%;
+  }
+
+  .flow-milestone-silhouette {
+    width: 100%;
+    opacity: 0.25;
+  }
+}
+
+/* Small Mobile (< 540px) */
+@media (max-width: 539px) {
+  .flow-focus-body {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 14px;
+  }
+
+  .flow-focus-right {
+    width: 100%;
+  }
+}

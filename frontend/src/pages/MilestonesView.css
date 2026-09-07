@@ -1,0 +1,203 @@
+/* Milestones Page Styles & Grid */
+
+.flow-milestones-container {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 14px;
+  align-items: start;
+}
+
+.flow-milestones-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.flow-milestones-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Hero Banner */
+.flow-milestones-hero {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #070a10 0%, #0d121c 45%, #14111f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  min-height: 124px;
+}
+
+.flow-milestones-hero-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 75% 70%, rgba(56, 189, 248, 0.12) 0%, rgba(139, 92, 246, 0.15) 30%, transparent 65%);
+}
+
+.flow-milestones-hero-silhouette {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.flow-milestones-hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 540px;
+}
+
+.flow-milestones-hero-quote {
+  position: relative;
+  z-index: 2;
+  max-width: 250px;
+  text-align: right;
+  font-style: italic;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: rgba(240, 242, 247, 0.75);
+}
+
+/* Milestone List Items */
+.flow-milestones-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.flow-milestone-card {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  gap: 16px;
+}
+
+.flow-milestone-card:hover {
+  border-color: var(--color-border-hover);
+  background: rgba(255, 255, 255, 0.015);
+  transform: translateY(-1px);
+}
+
+.flow-milestone-card.completed {
+  border-left: 3px solid #00e599;
+}
+
+/* Tag Pills */
+.flow-tag-label {
+  font-size: 10px;
+  color: #4e5564;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.flow-skill-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  font-size: 10px;
+  color: #8e95a5;
+  font-weight: 500;
+}
+
+/* Sidebar Create Milestone Card */
+.flow-create-card {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.flow-create-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 11.5px;
+  color: #ffffff;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.flow-create-input:focus {
+  border-color: #00e599;
+}
+
+.flow-submit-btn {
+  align-self: flex-end;
+  background: #00e599;
+  color: #080b11;
+  font-size: 11.5px;
+  font-weight: 800;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 6.5px 16px;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(0, 229, 153, 0.35);
+  transition: all 0.15s ease;
+}
+
+.flow-submit-btn:hover {
+  background: #00f5a0;
+  box-shadow: 0 0 20px rgba(0, 229, 153, 0.5);
+  transform: scale(1.02);
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1150px) {
+  .flow-milestones-container {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 950px) {
+  .flow-milestones-container {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .flow-milestones-sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+}
+
+@media (max-width: 650px) {
+  .flow-milestones-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-milestone-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -183,3 +183,68 @@ export interface DashboardOverview {
   active_departments: ActiveDepartmentSummary[]
   recent_activity: RecentActivityItem[]
 }
+
+export interface TimeSession {
+  id: number
+  user_id: number
+  department_id: number | null
+  goal_id: number | null
+  roadmap_item_id: number | null
+  skill_id: number | null
+  project_id: number | null
+  task_id: number | null
+  start_time: string
+  end_time: string | null
+  last_paused_at: string | null
+  duration_seconds: number
+  pause_duration_seconds: number
+  status: 'running' | 'paused' | 'completed' | 'discarded' | string
+  note: string | null
+  created_at: string
+  department_name: string | null
+  goal_name: string | null
+  roadmap_item_name: string | null
+  skill_name: string | null
+  project_name: string | null
+  task_name: string | null
+}
+
+export interface TimeSessionStartRequest {
+  department_id?: number | null
+  goal_id?: number | null
+  roadmap_item_id?: number | null
+  skill_id?: number | null
+  project_id?: number | null
+  task_id?: number | null
+  note?: string | null
+}
+
+export interface TimeSessionStopRequest {
+  note?: string | null
+  update_focus_note?: boolean
+}
+
+export interface TimeSessionManualCreate {
+  start_time: string
+  end_time: string
+  department_id?: number | null
+  goal_id?: number | null
+  roadmap_item_id?: number | null
+  skill_id?: number | null
+  project_id?: number | null
+  task_id?: number | null
+  note?: string | null
+}
+
+export interface DepartmentTimeSummary {
+  department_id: number
+  department_name: string
+  duration_seconds: number
+}
+
+export interface TimeSummaryResponse {
+  today_seconds: number
+  week_seconds: number
+  total_seconds: number
+  by_department: DepartmentTimeSummary[]
+}

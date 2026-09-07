@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Plus, Trash2, Zap } from 'lucide-react'
 import { api } from '../api/client'
 import type { Roadmap, RoadmapItem, RoadmapItemTree, Skill } from '../api/types'
 
@@ -19,13 +20,11 @@ export function SkillsView({ departmentId }: { departmentId: number }) {
   const [roadmapItems, setRoadmapItems] = useState<RoadmapItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  // New skill form state
   const [name, setName] = useState('')
   const [purpose, setPurpose] = useState('')
   const [prereqText, setPrereqText] = useState('')
   const [addingSkill, setAddingSkill] = useState(false)
 
-  // Map of skill_id -> list of linked roadmap items
   const [linkedItems, setLinkedItems] = useState<Record<number, number[]>>({})
   const [selectedItemToLink, setSelectedItemToLink] = useState<Record<number, number | ''>>({})
 
@@ -33,7 +32,6 @@ export function SkillsView({ departmentId }: { departmentId: number }) {
     const list = await api.get<Skill[]>(`/departments/${departmentId}/skills`)
     setSkills(list)
 
-    // Load department roadmap items to allow linking
     const roadmaps = await api.get<Roadmap[]>(`/departments/${departmentId}/roadmaps`)
     const items: RoadmapItem[] = []
     for (const rm of roadmaps) {
@@ -97,38 +95,44 @@ export function SkillsView({ departmentId }: { departmentId: number }) {
     }))
   }
 
-  if (loading) return <div className="card">Loading skills...</div>
+  if (loading) return <div className="card">Loading skills inventory...</div>
 
   return (
     <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>Skills</h2>
-        <button className={addingSkill ? '' : 'primary'} onClick={() => setAddingSkill(!addingSkill)}>
-          {addingSkill ? 'Cancel' : '+ Add Skill'}
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Skills & Capabilities</h2>
+          <div style={{ fontSize: 12, color: 'var(--color-text-faint)' }}>
+            Track proficiency and anchor skills to roadmap objectives.
+          </div>
+        </div>
+        <button className="primary" onClick={() => setAddingSkill(!addingSkill)} style={{ fontSize: 12 }}>
+          <Plus size={14} />
+          {addingSkill ? 'Cancel' : 'Add Skill'}
         </button>
       </div>
 
       {addingSkill && (
-        <form onSubmit={handleCreate} className="card" style={{ display: 'grid', gap: 'var(--space-2)' }}>
-          <label style={{ display: 'grid', gap: 'var(--space-1)' }}>
+        <form onSubmit={handleCreate} className="card" style={{ display: 'grid', gap: 'var(--space-3)' }}>
+          <label style={{ display: 'grid', gap: 'var(--space-1)', fontSize: 13, fontWeight: 600 }}>
             Skill Name
-            <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Distributed Systems" />
+            <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Distributed Systems & Concurrency" />
           </label>
-          <label style={{ display: 'grid', gap: 'var(--space-1)' }}>
+          <label style={{ display: 'grid', gap: 'var(--space-1)', fontSize: 13, fontWeight: 600 }}>
             Purpose / Why
             <textarea
               rows={2}
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
-              placeholder="Why this skill is needed..."
+              placeholder="Why this capability is essential to acquire..."
             />
           </label>
-          <label style={{ display: 'grid', gap: 'var(--space-1)' }}>
+          <label style={{ display: 'grid', gap: 'var(--space-1)', fontSize: 13, fontWeight: 600 }}>
             Prerequisite notes
             <input
               value={prereqText}
               onChange={(e) => setPrereqText(e.target.value)}
-              placeholder="e.g. Basic networking, concurrency"
+              placeholder="e.g. OS primitives, socket programming"
             />
           </label>
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -144,13 +148,16 @@ export function SkillsView({ departmentId }: { departmentId: number }) {
 
       <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
         {skills.map((skill) => (
-          <div key={skill.id} className="card" style={{ display: 'grid', gap: 'var(--space-2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+          <div key={skill.id} className="card" style={{ display: 'grid', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 16 }}>{skill.name}</div>
-                {skill.purpose && <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{skill.purpose}</div>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Zap size={16} color="var(--color-accent-text)" />
+                  <span style={{ fontWeight: 700, fontSize: 16 }}>{skill.name}</span>
+                </div>
+                {skill.purpose && <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: '4px 0 0' }}>{skill.purpose}</p>}
                 {skill.prerequisite_text && (
-                  <div style={{ color: 'var(--color-text-faint)', fontSize: 12 }}>
+                  <div style={{ color: 'var(--color-text-faint)', fontSize: 12, marginTop: 4 }}>
                     Prereqs: {skill.prerequisite_text}
                   </div>
                 )}
@@ -160,34 +167,37 @@ export function SkillsView({ departmentId }: { departmentId: number }) {
                 <select
                   value={skill.status}
                   onChange={(e) => handleUpdate(skill.id, { status: e.target.value })}
-                  style={{ fontSize: 12, padding: '2px 4px' }}
+                  style={{ fontSize: 11, padding: '3px 6px' }}
                 >
                   <option value="not_started">Not Started</option>
                   <option value="in_progress">In Progress</option>
                   <option value="completed">Completed</option>
                 </select>
-                <button onClick={() => handleDelete(skill.id)} style={{ fontSize: 12, padding: '2px 6px' }}>
-                  Delete
+                <button onClick={() => handleDelete(skill.id)} style={{ padding: '4px 8px', fontSize: 11 }}>
+                  <Trash2 size={12} />
                 </button>
               </div>
             </div>
 
-            {/* Progress Slider */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 12 }}>
-              <span>Progress: {skill.progress}%</span>
+            {/* Proficiency slider */}
+            <div style={{ display: 'grid', gap: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--color-text-muted)' }}>Proficiency</span>
+                <strong style={{ color: 'var(--color-accent-text)' }}>{skill.progress}%</strong>
+              </div>
               <input
                 type="range"
                 min={0}
                 max={100}
                 value={skill.progress}
                 onChange={(e) => handleUpdate(skill.id, { progress: Number(e.target.value) })}
-                style={{ flex: 1 }}
+                style={{ width: '100%', accentColor: 'var(--color-accent)' }}
               />
             </div>
 
             {/* Linked Roadmap Items */}
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-2)', fontSize: 12 }}>
-              <span style={{ color: 'var(--color-text-muted)' }}>Linked Roadmap Items: </span>
+              <span style={{ color: 'var(--color-text-faint)' }}>Anchored Roadmap Objectives: </span>
               {(linkedItems[skill.id] ?? []).map((itemId) => {
                 const item = roadmapItems.find((i) => i.id === itemId)
                 return (
@@ -198,7 +208,8 @@ export function SkillsView({ departmentId }: { departmentId: number }) {
                       alignItems: 'center',
                       gap: 4,
                       background: 'var(--color-surface-raised)',
-                      padding: '2px 6px',
+                      border: '1px solid var(--color-border)',
+                      padding: '2px 8px',
                       borderRadius: 'var(--radius-sm)',
                       marginRight: 6,
                     }}
@@ -207,7 +218,7 @@ export function SkillsView({ departmentId }: { departmentId: number }) {
                     <button
                       type="button"
                       onClick={() => handleUnlinkItem(skill.id, itemId)}
-                      style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
+                      style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-text-faint)' }}
                     >
                       ×
                     </button>
@@ -227,7 +238,7 @@ export function SkillsView({ departmentId }: { departmentId: number }) {
                     }
                     style={{ fontSize: 11, padding: '2px 4px' }}
                   >
-                    <option value="">+ Link Roadmap Item</option>
+                    <option value="">+ Link Objective</option>
                     {roadmapItems
                       .filter((ri) => !(linkedItems[skill.id] ?? []).includes(ri.id))
                       .map((ri) => (
@@ -252,8 +263,8 @@ export function SkillsView({ departmentId }: { departmentId: number }) {
         ))}
 
         {skills.length === 0 && !addingSkill && (
-          <div className="card" style={{ color: 'var(--color-text-muted)' }}>
-            No skills tracked for this department yet. Click "+ Add Skill" to start tracking.
+          <div className="card" style={{ color: 'var(--color-text-faint)', textAlign: 'center', padding: 'var(--space-5)' }}>
+            No skills tracked yet. Click "Add Skill" to define the capabilities you are mastering.
           </div>
         )}
       </div>
